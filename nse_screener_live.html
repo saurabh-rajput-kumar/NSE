@@ -1700,10 +1700,20 @@ function renderFII(data) {
   if (!days.length) {
     document.getElementById('area').innerHTML = `
       <div class="sh">🌍 FII / DII Tracker</div>
-      <div class="empty" style="color:var(--red)">
-        ⚠️ Could not fetch FII/DII data from NSE.<br>
-        <span style="font-size:.72rem;color:var(--muted2)">NSE may be down or blocking requests. Try refreshing in a few minutes.</span><br><br>
-        <button class="btn btn-out" style="font-size:.72rem" onclick="FII_TS=0;rFII()">🔄 Try Again</button>
+      <div class="cwrap" style="padding:20px;text-align:center;margin:10px 0">
+        <div style="font-size:2rem;margin-bottom:10px">🌐</div>
+        <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:6px">
+          Live FII/DII data temporarily unavailable
+        </div>
+        <div style="font-size:.72rem;color:var(--muted2);margin-bottom:16px;max-width:320px;margin-left:auto;margin-right:auto">
+          NSE/BSE block automated fetches from cloud servers. Data will appear once a working source responds. Check live data directly:
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px">
+          <a href="https://www.nseindia.com/market-data/fii-dii-activity" target="_blank" class="btn btn-out" style="font-size:.72rem;text-decoration:none">📊 NSE FII/DII</a>
+          <a href="https://www.bseindia.com/markets/Equity/EQReports/FIIDIITradingActivity.aspx" target="_blank" class="btn btn-out" style="font-size:.72rem;text-decoration:none">📈 BSE FII/DII</a>
+          <a href="https://www.moneycontrol.com/stocks/marketstats/fii_dii_activity/index.php" target="_blank" class="btn btn-out" style="font-size:.72rem;text-decoration:none">💹 MoneyControl</a>
+        </div>
+        <button class="btn" style="font-size:.72rem" onclick="FII_TS=0;rFII()">🔄 Try Again</button>
       </div>`;
     return;
   }
@@ -1729,12 +1739,13 @@ function renderFII(data) {
     <div class="sh">🌍 FII / DII Tracker
       <div class="sh-line"></div>
       <span style="font-size:.63rem;font-weight:500;padding:2px 8px;border-radius:20px;
-        background:${isLive?'rgba(0,212,154,.1)':'rgba(240,180,41,.1)'};
-        color:${isLive?'var(--green)':'var(--yellow)'};
-        border:1px solid ${isLive?'rgba(0,212,154,.25)':'rgba(240,180,41,.25)'}">
-        ${isLive ? '🟢 Live' : '⚠️ Cached'} · ${data.source||'NSE India'}
+        background:rgba(0,212,154,.1);color:var(--green);
+        border:1px solid rgba(0,212,154,.25)">
+        🟢 ${data.source||'NSE India'}
       </span>
-      ${data.updated ? `<span style="font-size:.6rem;color:var(--muted2)">Updated: ${data.updated}</span>` : ''}
+      <span style="font-size:.6rem;color:var(--muted2)">
+        ${data.updated||''} ${data.age ? '· fetched '+data.age : ''}
+      </span>
     </div>
 
     <!-- Summary cards -->

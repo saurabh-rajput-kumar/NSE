@@ -568,7 +568,7 @@ input,select,textarea{font-size:16px!important;}
 </div>
 
 <div class="main">
-  <div class="ibox"><strong>ℹ️ NSE Swing Screener Pro v2.1</strong> — Data fetched via <strong style="color:var(--green)">local Python proxy → Yahoo Finance</strong>. Proxy must be running: <code style="background:var(--card2);padding:1px 6px;border-radius:4px">python nse_proxy.py</code>. When hosted on Render, open your Render URL. Locally, open <a href="http://localhost:5000" style="color:var(--accent)">localhost:5000</a>. Prices are live/EOD from Yahoo Finance.</div>
+  <div class="ibox"><strong>ℹ️ NSE Screener Pro</strong> — Live data via <strong style="color:var(--green)">Yahoo Finance</strong>. Tap <strong>⚡ Load</strong> to start screening. Prices are live/EOD.</div>
   <div id="area"><div class="empty">Click <strong>🔄 Load Data</strong> to begin screening.</div></div>
 </div>
 
@@ -646,15 +646,22 @@ function rc(a,p=14){if(a.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++
 function bbc(a,p=20){const m=a.reduce((x,y)=>x+y,0)/a.length;const s=Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/a.length);return{u:m+2*s,l:m-2*s,m};}
 function src(cs,hs,ls,price){const n=cs.length;if(n<3)return{r:[],s:[]};const H=hs[n-2],L=ls[n-2],C=cs[n-2],P=(H+L+C)/3;const R1=2*P-L,R2=P+(H-L),R3=H+2*(P-L);const S1=2*P-H,S2=P-(H-L),S3=L-2*(H-P);const sr=[],ss=[];for(let i=1;i<Math.min(20,n-1);i++){if(hs[n-1-i]>hs[n-2-i]&&hs[n-1-i]>hs[n-i])sr.push(hs[n-1-i]);if(ls[n-1-i]<ls[n-2-i]&&ls[n-1-i]<ls[n-i])ss.push(ls[n-1-i]);}return{r:[R1,R2,R3,...sr].filter(v=>v>price).sort((a,b)=>a-b).slice(0,3),s:[S1,S2,S3,...ss].filter(v=>v<price).sort((a,b)=>b-a).slice(0,3)};}
 
-// ── LOCAL PROXY DATA LAYER ───────────────────────────────────────────────────
-// All fetches go to python proxy at localhost:5000 → Yahoo Finance server-side.
-// No browser CORS issues. Standard Yahoo v8/finance/chart response format.
+// ── DATA LAYER ───────────────────────────────────────────────────────────────
+// PROXY_BASE auto-detects whether we're on Render or running locally.
+// On Render: uses same-origin (the Flask app serves both HTML + /api/*)
+// Locally:   falls back to localhost:5000 (nse_proxy.py)
 
-const PROXY = 'http://localhost:5000/api/chart';
+const PROXY_BASE = (() => {
+  const h = window.location.hostname;
+  if (h && h !== 'localhost' && h !== '127.0.0.1' && !h.startsWith('192.168')) {
+    return window.location.origin;   // Render / any hosted URL
+  }
+  return 'http://localhost:5000';    // local proxy
+})();
 
 async function fetchS(sym) {
   try {
-    const r = await fetch(`${PROXY}?symbol=${encodeURIComponent(sym)}`, {
+    const r = await fetch(`${PROXY_BASE}/api/chart?symbol=${encodeURIComponent(sym)}`, {
       signal: AbortSignal.timeout(15000)
     });
     if (!r.ok) return null;
@@ -1438,7 +1445,7 @@ async function loadData(){
   sf.innerHTML='<option value="all">All Sectors</option>'+secs.map(s=>`<option value="${s}">${s}</option>`).join('');
   document.getElementById('lu').textContent='✅ '+new Date().toLocaleTimeString('en-IN');
   b.disabled=false;b.textContent='⚡ Load';
-  if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty" style="color:var(--red)">⚠️ Proxy not running. Open a terminal and run: <strong>python nse_proxy.py</strong><br><br>Then reload this page.</div>`;return;}
+  if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty" style="color:var(--red)">⚠️ Could not load data. If you're on Render, wait 30 seconds and try again (free tier may be waking up). If running locally, make sure <strong>python nse_proxy.py</strong> is running.</div>`;return;}
   startARI();if(ARE)startAR();rs();
 }
 
@@ -1645,7 +1652,7 @@ function addAl(){const sym=document.getElementById('as').value.trim().toUpperCas
 function qAl(sym,price){document.getElementById('as').value=sym;document.getElementById('ap').value=price.toFixed(1);om('alm');}
 function rAl(id){ALT=ALT.filter(a=>a.id!==id);localStorage.setItem('alt',JSON.stringify(ALT));rALL();}
 function rALL(){const el=document.getElementById('all');if(!ALT.length){el.innerHTML=`<p style="color:var(--muted);font-size:.76rem">No alerts set.</p>`;return;}el.innerHTML=`<div class="tw"><table><thead><tr><th>Symbol</th><th>Price</th><th>Cond</th><th>Status</th><th></th></tr></thead><tbody>${ALT.map(a=>`<tr><td><strong>${a.sym}</strong></td><td>₹${a.price}</td><td>${a.cond==='above'?'↑':'↓'}</td><td style="color:${a.triggered?'var(--muted)':'var(--yellow)'}">${a.triggered?'✅':'⏳'}</td><td><button onclick="rAl(${a.id})" style="background:none;border:none;color:var(--red);cursor:pointer">✕</button></td></tr>`).join('')}</tbody></table></div>`;}
-async function chkAlerts(){const act=ALT.filter(a=>!a.triggered);if(!act.length)return;for(const a of act){try{const r=await fetch(`http://localhost:5000/api/chart?symbol=${encodeURIComponent(a.sym)}`,{signal:AbortSignal.timeout(12000)});if(!r.ok)continue;const d=await r.json();const price=d?.chart?.result?.[0]?.meta?.regularMarketPrice;if(!price)continue;const triggered=(a.cond==='above'&&price>=a.price)||(a.cond==='below'&&price<=a.price);if(triggered){a.triggered=true;const type=a.cond==='above'?'up':'dn';playSound(type);toast(`${a.sym} ₹${price.toFixed(1)} — ${a.cond==='above'?'crossed above':'crossed below'} ₹${a.price}`,type);localStorage.setItem('alt',JSON.stringify(ALT));document.getElementById('alc').textContent=ALT.filter(x=>!x.triggered).length;}}catch(e){}}}
+async function chkAlerts(){const act=ALT.filter(a=>!a.triggered);if(!act.length)return;for(const a of act){try{const r=await fetch(`${PROXY_BASE}/api/chart?symbol=${encodeURIComponent(a.sym)}`,{signal:AbortSignal.timeout(12000)});if(!r.ok)continue;const d=await r.json();const price=d?.chart?.result?.[0]?.meta?.regularMarketPrice;if(!price)continue;const triggered=(a.cond==='above'&&price>=a.price)||(a.cond==='below'&&price<=a.price);if(triggered){a.triggered=true;const type=a.cond==='above'?'up':'dn';playSound(type);toast(`${a.sym} ₹${price.toFixed(1)} — ${a.cond==='above'?'crossed above':'crossed below'} ₹${a.price}`,type);localStorage.setItem('alt',JSON.stringify(ALT));document.getElementById('alc').textContent=ALT.filter(x=>!x.triggered).length;}}catch(e){}}}
 
 function toast(msg,type){const ta=document.getElementById('ta');const el=document.createElement('div');el.className=`ti ${type==='up'?'tiu':type==='dn'?'tid':''}`;el.innerHTML=`${type==='up'?'📈':type==='dn'?'📉':'ℹ️'} ${msg}`;ta.appendChild(el);setTimeout(()=>el.remove(),4500);}
 
@@ -1699,128 +1706,170 @@ function getFIIFallback() {
 }
 
 function renderFII(data) {
-  const days  = data.days || [];
-  const fn    = days.map(d => d.fiiNet);
-  const dn    = days.map(d => d.diiNet);
-  const fLast = fn[0] || 0, dLast = dn[0] || 0;
-  const fTot  = fn.reduce((a,b)=>a+b,0), dTot = dn.reduce((a,b)=>a+b,0);
-  const fDays = fn.filter(v=>v>0).length, dDays = dn.filter(v=>v>0).length;
+  const days   = data.days || [];
   const isLive = data.live !== false;
+  const hasDII = data.hasDII !== false && days.some(d => d.diiNet && d.diiNet !== 0);
 
-  const fCol  = v => v > 0 ? 'var(--green)' : 'var(--red)';
-  const fmt   = v => `${v>0?'+':''}₹${Math.abs(v).toLocaleString('en-IN')} Cr`;
-  const fmtK  = v => v > 0 ? `+₹${(v/100).toFixed(1)}K Cr` : `-₹${(Math.abs(v)/100).toFixed(1)}K Cr`;
+  if (!days.length) {
+    document.getElementById('area').innerHTML = `
+      <div class="sh">🌍 FII / DII Tracker</div>
+      <div class="empty" style="color:var(--red)">
+        ⚠️ Could not fetch FII/DII data from NSE.<br>
+        <span style="font-size:.72rem;color:var(--muted2)">NSE may be down or blocking requests. Try refreshing in a few minutes.</span><br><br>
+        <button class="btn btn-out" style="font-size:.72rem" onclick="FII_TS=0;rFII()">🔄 Try Again</button>
+      </div>`;
+    return;
+  }
+
+  const fn    = days.map(d => +(d.fiiNet||0));
+  const dn    = days.map(d => +(d.diiNet||0));
+  const fLast = fn[0]||0, dLast = dn[0]||0;
+  const fTot  = fn.reduce((a,b)=>a+b,0);
+  const dTot  = dn.reduce((a,b)=>a+b,0);
+  const fBuyDays = fn.filter(v=>v>0).length;
+
+  const fCol = v => v > 0 ? 'var(--green)' : 'var(--red)';
+  const fmt  = v => `${v>=0?'+':''}₹${Math.abs(v).toLocaleString('en-IN',{maximumFractionDigits:0})} Cr`;
+  const fmtK = v => `${v>=0?'+':'-'}₹${(Math.abs(v)/100).toFixed(1)}K Cr`;
+
+  const bias  = fTot + dTot;
+  const bLabel= bias > 8000 ? '🟢 Strong Buying' : bias > 0 ? '🟡 Mild Buying' : bias > -8000 ? '🟠 Mild Selling' : '🔴 Strong Selling';
+  const bCol  = bias > 0 ? 'var(--green)' : 'var(--red)';
+  const bPct  = Math.min(Math.abs(bias)/25000*100, 100).toFixed(0);
 
   document.getElementById('area').innerHTML = `
+    <!-- Header -->
     <div class="sh">🌍 FII / DII Tracker
       <div class="sh-line"></div>
-      <span style="font-size:.65rem;font-weight:400;color:${isLive?'var(--green)':'var(--yellow)'}">
-        ${isLive ? '🟢 Live · NSE India' : '⚠️ ' + (data.source||'Cached')}
+      <span style="font-size:.63rem;font-weight:500;padding:2px 8px;border-radius:20px;
+        background:${isLive?'rgba(0,212,154,.1)':'rgba(240,180,41,.1)'};
+        color:${isLive?'var(--green)':'var(--yellow)'};
+        border:1px solid ${isLive?'rgba(0,212,154,.25)':'rgba(240,180,41,.25)'}">
+        ${isLive ? '🟢 Live' : '⚠️ Cached'} · ${data.source||'NSE India'}
       </span>
+      ${data.updated ? `<span style="font-size:.6rem;color:var(--muted2)">Updated: ${data.updated}</span>` : ''}
     </div>
 
-    <!-- Summary pills -->
+    <!-- Summary cards -->
     <div class="srow" style="margin-bottom:14px">
-      <div class="pill ${fLast>0?'p-green':''}">
-        <strong style="color:${fCol(fLast)}">${fmt(fLast)}</strong>FII Latest Day
+      <div class="pill ${fLast>=0?'p-green':''}">
+        <strong style="color:${fCol(fLast)}">${fmt(fLast)}</strong>FII Today
       </div>
-      <div class="pill ${dLast>0?'p-blue':''}">
-        <strong style="color:${fCol(dLast)}">${fmt(dLast)}</strong>DII Latest Day
-      </div>
-      <div class="pill ${fTot>0?'p-green':''}">
-        <strong style="color:${fCol(fTot)}">${fmtK(fTot)}</strong>FII ${days.length}-Day Net
-      </div>
-      <div class="pill ${dTot>0?'p-blue':''}">
-        <strong style="color:${fCol(dTot)}">${fmtK(dTot)}</strong>DII ${days.length}-Day Net
-      </div>
+      ${hasDII ? `<div class="pill ${dLast>=0?'p-blue':''}">
+        <strong style="color:${fCol(dLast)}">${fmt(dLast)}</strong>DII Today
+      </div>` : ''}
       <div class="pill">
-        <strong style="color:${fDays>days.length/2?'var(--green)':'var(--red)'}">${fDays}/${days.length}</strong>FII Buy Days
+        <strong style="color:${fCol(fTot)}">${fmtK(fTot)}</strong>FII ${days.length}-Day
+      </div>
+      ${hasDII ? `<div class="pill">
+        <strong style="color:${fCol(dTot)}">${fmtK(dTot)}</strong>DII ${days.length}-Day
+      </div>` : ''}
+      <div class="pill">
+        <strong style="color:${fBuyDays>days.length/2?'var(--green)':'var(--red)'}">${fBuyDays}/${days.length}</strong>FII Buy Days
       </div>
     </div>
 
-    <!-- Sentiment indicator -->
-    ${(() => {
-      const bias = fTot + dTot;
-      const label = bias > 5000 ? 'Strong Buy' : bias > 0 ? 'Mild Buy' : bias > -5000 ? 'Mild Sell' : 'Strong Sell';
-      const col   = bias > 0 ? 'var(--green)' : 'var(--red)';
-      const pct   = Math.min(Math.abs(bias) / 20000 * 100, 100);
-      return `<div class="cwrap" style="padding:14px;margin-bottom:14px">
-        <div style="font-size:.7rem;color:var(--muted2);margin-bottom:8px;font-weight:600">COMBINED INSTITUTIONAL SENTIMENT</div>
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="flex:1">
-            <div style="height:8px;background:var(--border);border-radius:8px;overflow:hidden">
-              <div style="height:100%;width:${pct}%;background:${col};border-radius:8px;transition:width .6s"></div>
-            </div>
-          </div>
-          <div style="font-size:.9rem;font-weight:800;color:${col};white-space:nowrap">${label}</div>
+    <!-- Sentiment bar -->
+    <div class="cwrap" style="padding:14px;margin-bottom:14px">
+      <div style="font-size:.67rem;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+        Institutional Sentiment (${days.length}-Day)
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div style="flex:1;height:10px;background:var(--border);border-radius:10px;overflow:hidden">
+          <div style="height:100%;width:${bPct}%;background:${bCol};border-radius:10px;transition:width .8s cubic-bezier(.4,0,.2,1)"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:.67rem;color:var(--muted2)">
-          <span>FII: <strong style="color:${fCol(fTot)}">${fTot>0?'+':''}${(fTot/100).toFixed(1)}K Cr</strong></span>
-          <span>DII: <strong style="color:${fCol(dTot)}">${dTot>0?'+':''}${(dTot/100).toFixed(1)}K Cr</strong></span>
-          <span>Combined: <strong style="color:${fCol(bias)}">${bias>0?'+':''}${((bias)/100).toFixed(1)}K Cr</strong></span>
+        <div style="font-size:.85rem;font-weight:800;color:${bCol};white-space:nowrap">${bLabel}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
+        <div style="background:var(--card2);border-radius:8px;padding:8px">
+          <div style="font-size:.9rem;font-weight:800;color:${fCol(fTot)}">${fmtK(fTot)}</div>
+          <div style="font-size:.6rem;color:var(--muted2);margin-top:2px">FII Net</div>
         </div>
-      </div>`;
-    })()}
+        ${hasDII ? `<div style="background:var(--card2);border-radius:8px;padding:8px">
+          <div style="font-size:.9rem;font-weight:800;color:${fCol(dTot)}">${fmtK(dTot)}</div>
+          <div style="font-size:.6rem;color:var(--muted2);margin-top:2px">DII Net</div>
+        </div>` : '<div></div>'}
+        <div style="background:var(--card2);border-radius:8px;padding:8px">
+          <div style="font-size:.9rem;font-weight:800;color:${fCol(bias)}">${fmtK(bias)}</div>
+          <div style="font-size:.6rem;color:var(--muted2);margin-top:2px">Combined</div>
+        </div>
+      </div>
+    </div>
 
-    <!-- Bar chart -->
+    <!-- Chart -->
     <div class="cwrap" style="margin-bottom:14px">
-      <div style="font-size:.7rem;color:var(--muted2);margin-bottom:10px;font-weight:600">DAILY FII vs DII NET FLOW (₹ Cr)</div>
-      <div style="height:180px;position:relative"><canvas id="fC"></canvas></div>
+      <div style="font-size:.67rem;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+        Daily Net Flow · ₹ Crore
+      </div>
+      <div style="height:190px;position:relative"><canvas id="fC"></canvas></div>
     </div>
 
     <!-- Table -->
-    <div class="tw">
-      <table>
-        <thead><tr><th>Date</th><th>FII Net</th><th>DII Net</th><th>Combined</th></tr></thead>
-        <tbody>
-          ${days.map(d => {
-            const f=d.fiiNet, di=d.diiNet, comb=f+di;
-            return `<tr>
-              <td style="font-size:.7rem;color:var(--muted2)">${d.d}</td>
-              <td style="color:${fCol(f)};font-weight:700">${fmt(f)}</td>
-              <td style="color:${fCol(di)};font-weight:700">${fmt(di)}</td>
-              <td style="color:${fCol(comb)};font-weight:600">${fmt(comb)}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Update button -->
-    <div style="text-align:center;margin-top:12px">
-      <button class="btn btn-out" style="font-size:.72rem" onclick="FII_TS=0;rFII()">🔄 Refresh FII/DII</button>
-      <div style="font-size:.62rem;color:var(--muted);margin-top:6px">
-        Data from NSE India · Updates after market close · ${isLive ? 'Live' : 'Update proxy for live data — see below'}
+    <div class="cwrap" style="padding:0;overflow:hidden">
+      <div class="tw">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th style="color:var(--green)">FII Net</th>
+              ${hasDII ? '<th style="color:var(--blue)">DII Net</th>' : ''}
+              ${days[0]?.fiiBuy ? '<th>FII Buy</th><th>FII Sell</th>' : ''}
+              ${hasDII ? '<th>Combined</th>' : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${days.map(d => {
+              const f=+(d.fiiNet||0), di=+(d.diiNet||0), comb=f+di;
+              return `<tr>
+                <td style="font-size:.69rem;color:var(--muted2);white-space:nowrap">${d.d}</td>
+                <td style="color:${fCol(f)};font-weight:700;font-size:.75rem">${fmt(f)}</td>
+                ${hasDII ? `<td style="color:${fCol(di)};font-weight:700;font-size:.75rem">${fmt(di)}</td>` : ''}
+                ${d.fiiBuy ? `<td style="font-size:.69rem;color:var(--green)">₹${Math.abs(d.fiiBuy).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+                              <td style="font-size:.69rem;color:var(--red)">₹${Math.abs(d.fiiSell||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>` : ''}
+                ${hasDII ? `<td style="color:${fCol(comb)};font-weight:600;font-size:.72rem">${fmt(comb)}</td>` : ''}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
       </div>
     </div>
-    ${!isLive ? `<div class="ibox" style="margin-top:12px">
-      <strong>⚠️ To get live FII/DII data:</strong> Stop the proxy, download the new <code>nse_proxy.py</code> from this session, and restart it. The new proxy has an <code>/api/fii</code> endpoint that fetches from NSE India automatically.
-    </div>` : ''}
+
+    <!-- Refresh -->
+    <div style="text-align:center;margin-top:14px;padding-bottom:4px">
+      <button class="btn btn-out" style="font-size:.72rem" onclick="FII_TS=0;rFII()">🔄 Refresh</button>
+      <div style="font-size:.61rem;color:var(--muted);margin-top:6px">
+        FII/DII data updates after 6:30 PM IST each trading day · Source: ${data.source||'NSE India'}
+      </div>
+    </div>
   `;
 
+  // Chart
   setTimeout(() => {
     const c = document.getElementById('fC');
     if (!c) return;
+    const labels = days.map(d => d.d).reverse();
+    const fnR = [...fn].reverse();
+    const dnR = [...dn].reverse();
+    const ds = [
+      { label:'FII Net', data:fnR,
+        backgroundColor:fnR.map(v=>v>=0?'rgba(0,212,154,.75)':'rgba(255,69,96,.75)'),
+        borderRadius:4, borderSkipped:false },
+    ];
+    if (hasDII) ds.push(
+      { label:'DII Net', data:dnR,
+        backgroundColor:dnR.map(v=>v>=0?'rgba(56,189,248,.65)':'rgba(251,146,60,.65)'),
+        borderRadius:4, borderSkipped:false }
+    );
     new Chart(c.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: days.map(d => d.d),
-        datasets: [
-          { label: 'FII Net', data: fn,
-            backgroundColor: fn.map(v => v>0 ? 'rgba(0,212,154,.7)' : 'rgba(255,69,96,.7)'),
-            borderRadius: 4 },
-          { label: 'DII Net', data: dn,
-            backgroundColor: dn.map(v => v>0 ? 'rgba(56,189,248,.7)' : 'rgba(251,146,60,.7)'),
-            borderRadius: 4 }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 9 } } } },
-        scales: {
-          x: { ticks: { color: '#6b7fa0', font: { size: 8 } }, grid: { color: '#1a2540' } },
-          y: { ticks: { color: '#6b7fa0', font: { size: 8 }, callback: v => '₹'+v },
-               grid: { color: '#1a2540' } }
+      type:'bar',
+      data:{ labels, datasets:ds },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ labels:{ color:'#e2e8f5', font:{ size:9 } } } },
+        scales:{
+          x:{ ticks:{ color:'#6b7fa0', font:{ size:7 }, maxRotation:45 }, grid:{ color:'#1a2540' } },
+          y:{ ticks:{ color:'#6b7fa0', font:{ size:8 }, callback:v=>'₹'+v.toLocaleString('en-IN') },
+              grid:{ color:'#1a2540' } }
         }
       }
     });

@@ -493,11 +493,45 @@ input,select,textarea{font-size:16px!important;}
   .strat-banner .sb-stat-v{font-size:1rem;}
 }
 
+/* ── Creator tag ── */
+.creator-tag{display:flex;align-items:center;gap:8px;text-decoration:none;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:20px;padding:5px 12px 5px 6px;transition:all .2s;flex-shrink:0;}
+.creator-tag:hover{background:rgba(167,139,250,.18);border-color:rgba(167,139,250,.5);}
+.creator-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#a78bfa,#6366f1);display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;color:#fff;flex-shrink:0;}
+.creator-info{display:flex;flex-direction:column;gap:0px;}
+.creator-name{font-size:.7rem;font-weight:700;color:#a78bfa;line-height:1.2;}
+.creator-role{font-size:.58rem;color:var(--muted2);line-height:1.2;}
+@media(max-width:600px){.creator-info{display:none;}.creator-tag{padding:4px;border-radius:50%;}.creator-tag:hover{background:rgba(167,139,250,.18);}}
+/* ── FII link cards ── */
+.fii-link-card{display:flex;align-items:center;gap:12px;padding:13px 15px;background:var(--card);border:1px solid var(--border);border-radius:12px;text-decoration:none;color:var(--text);transition:border-color .2s,background .2s;}
+.fii-link-card:hover{border-color:var(--accent);background:var(--card2);}
+.flc-left{flex-shrink:0;}
+.flc-logo{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;letter-spacing:.5px;}
+.flc-body{flex:1;min-width:0;}
+.flc-name{font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:3px;}
+.flc-desc{font-size:.67rem;color:var(--muted2);line-height:1.4;}
+.flc-arrow{font-size:1rem;color:var(--muted);flex-shrink:0;}
+/* ── Investment view ── */
+.inv-cap-block{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;}
+.inv-cap-header{padding:11px 15px;font-size:.76rem;font-weight:700;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);}
+.inv-stock-row{display:flex;align-items:flex-start;gap:10px;padding:10px 15px;border-top:1px solid var(--border);transition:background .15s;}
+.inv-stock-row:hover{background:var(--card2);}
+.inv-rank{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;flex-shrink:0;margin-top:2px;}
+.inv-sym{font-size:.8rem;font-weight:800;color:var(--text);min-width:95px;padding-top:2px;}
+.inv-reason{font-size:.68rem;color:var(--muted2);line-height:1.5;flex:1;}
+.inv-tag{display:inline-block;font-size:.58rem;padding:1px 6px;border-radius:8px;font-weight:700;margin:0 2px;}
+.inv-strat-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.25);color:#a78bfa;border-radius:20px;padding:3px 10px;font-size:.64rem;font-weight:600;}
 </style>
 </head>
 <body>
 <header>
   <h1><span class="logo-mark">N</span><span class="hl">NSE</span> Screener Pro</h1>
+  <a href="https://www.linkedin.com/in/saurabh-kumar-5a76b3152" target="_blank" class="creator-tag">
+    <span class="creator-avatar">SK</span>
+    <span class="creator-info">
+      <span class="creator-name">Saurabh Kumar</span>
+      <span class="creator-role">in/ Builder</span>
+    </span>
+  </a>
   <div class="hright">
     <span class="hbadge" id="lu">Live</span>
     <div style="display:flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:4px 9px;">
@@ -542,6 +576,10 @@ input,select,textarea{font-size:16px!important;}
     <div class="tf-tab" id="tf-pos" onclick="setTF('pos')" style="--tf-color:#00d49a">
       <span class="tf-icon">🏦</span>
       <span class="tf-label"><span class="tf-name">Positional</span><span class="tf-sub">4–16 Weeks</span></span>
+    </div>
+    <div class="tf-tab" id="tf-inv" onclick="setTF('inv')" style="--tf-color:#a78bfa">
+      <span class="tf-icon">💎</span>
+      <span class="tf-label"><span class="tf-name">Investment</span><span class="tf-sub">Long Term</span></span>
     </div>
   </div>
   <div class="strat-row" id="strat-row">
@@ -1358,10 +1396,24 @@ function hexToRGB(hex){
 function setTF(tf){
   ACTIVE_TF=tf;
   // Update tab active states
-  ['5d','2w','pos'].forEach(t=>{
+  ['5d','2w','pos','inv'].forEach(t=>{
     const el=document.getElementById('tf-'+t);
     if(el) el.classList.toggle('active', t===tf);
   });
+
+  // Investment tab — show dedicated view in area, hide screener
+  if(tf==='inv'){
+    document.getElementById('cbar').style.display='none';
+    document.getElementById('strat-row').innerHTML='';
+    // Switch to area view
+    const tabs=document.querySelectorAll('.ntab');
+    tabs.forEach(t=>t.classList.remove('active'));
+    document.getElementById('t-sc').classList.add('active');
+    gt('sc'); // ensure area is visible
+    rInv();
+    return;
+  }
+
   const strats=getStrats(tf);
   const keys=Object.keys(strats);
   ACTIVE_SUBSTRAT=keys[0];
@@ -1662,222 +1714,296 @@ function rMTF(){if(!AS.length){document.getElementById('area').innerHTML=`<div c
 // OI
 function rOI(){if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty">Load data first.</div>`;return;}const stocks=AS.sort((a,b)=>b.lastVol-a.lastVol).slice(0,30);document.getElementById('area').innerHTML=`<div class="sh">📈 OI Analysis (Volume Proxy)</div><div class="ibox"><strong>Note:</strong> Real OI needs NSE auth. Using volume proxy to estimate CE/PE interest.</div><div class="tw"><table><thead><tr><th>Symbol</th><th>Price</th><th>CE OI</th><th>PE OI</th><th>P/C</th><th>Sentiment</th><th>Key Level</th></tr></thead><tbody>${stocks.map(s=>{const pc=s.peOI/s.ceOI,sent=pc>1.2?'Bullish 🟢':pc<0.8?'Bearish 🔴':'Neutral 🟡';const kl=pc>1?s.sr.r[0]:s.sr.s[0];return`<tr><td><strong>${s.symbol}</strong></td><td>₹${s.price.toFixed(1)}</td><td>${(s.ceOI/100).toFixed(0)}L</td><td>${(s.peOI/100).toFixed(0)}L</td><td style="font-weight:700;color:${pc>1.2?'var(--green)':pc<0.8?'var(--red)':'var(--yellow)'}">${pc.toFixed(2)}</td><td>${sent}</td><td style="font-size:.72rem">${kl?'₹'+kl.toFixed(1):'–'}</td></tr>`;}).join('')}</tbody></table></div>`;}
 
-// FII/DII — live fetch via proxy /api/fii → NSE India
-let FII_CACHE = null, FII_TS = 0;
-
-async function rFII() {
-  const area = document.getElementById('area');
-  area.innerHTML = `<div class="loader"><div class="spin"></div><div class="lt">Fetching FII/DII data from NSE India...</div></div>`;
-
-  // Cache for 10 minutes
-  const now = Date.now();
-  if (FII_CACHE && now - FII_TS < 600000) { renderFII(FII_CACHE); return; }
-
-  try {
-    const r = await fetch(`${PROXY_BASE}/api/fii`, { signal: AbortSignal.timeout(12000) });
-    if (!r.ok) throw new Error('proxy error ' + r.status);
-    const data = await r.json();
-    if (data.error) throw new Error(data.error);
-    FII_CACHE = data; FII_TS = now;
-    renderFII(data);
-  } catch(e) {
-    console.warn('FII fetch failed:', e.message);
-    renderFII({ live: false, error: true, source: 'Server unreachable', days: [] });
-  }
-}
-
-function getFIIFallback() {
-  // Called when the server-side fetch fails entirely
-  // Return empty so renderFII shows the proper retry screen
-  return { live: false, error: true, source: 'NSE unavailable', days: [] };
-}
-
-function renderFII(data) {
-  const days   = data.days || [];
-  const isLive = data.live !== false;
-  const hasDII = data.hasDII !== false && days.some(d => d.diiNet && d.diiNet !== 0);
-
-  if (!days.length) {
-    document.getElementById('area').innerHTML = `
-      <div class="sh">🌍 FII / DII Tracker</div>
-      <div class="cwrap" style="padding:20px;text-align:center;margin:10px 0">
-        <div style="font-size:2rem;margin-bottom:10px">🌐</div>
-        <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:6px">
-          Live FII/DII data temporarily unavailable
-        </div>
-        <div style="font-size:.72rem;color:var(--muted2);margin-bottom:16px;max-width:320px;margin-left:auto;margin-right:auto">
-          NSE/BSE block automated fetches from cloud servers. Data will appear once a working source responds. Check live data directly:
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px">
-          <a href="https://www.nseindia.com/market-data/fii-dii-activity" target="_blank" class="btn btn-out" style="font-size:.72rem;text-decoration:none">📊 NSE FII/DII</a>
-          <a href="https://www.bseindia.com/markets/Equity/EQReports/FIIDIITradingActivity.aspx" target="_blank" class="btn btn-out" style="font-size:.72rem;text-decoration:none">📈 BSE FII/DII</a>
-          <a href="https://www.moneycontrol.com/stocks/marketstats/fii_dii_activity/index.php" target="_blank" class="btn btn-out" style="font-size:.72rem;text-decoration:none">💹 MoneyControl</a>
-        </div>
-        <button class="btn" style="font-size:.72rem" onclick="FII_TS=0;rFII()">🔄 Try Again</button>
-      </div>`;
-    return;
-  }
-
-  const fn    = days.map(d => +(d.fiiNet||0));
-  const dn    = days.map(d => +(d.diiNet||0));
-  const fLast = fn[0]||0, dLast = dn[0]||0;
-  const fTot  = fn.reduce((a,b)=>a+b,0);
-  const dTot  = dn.reduce((a,b)=>a+b,0);
-  const fBuyDays = fn.filter(v=>v>0).length;
-
-  const fCol = v => v > 0 ? 'var(--green)' : 'var(--red)';
-  const fmt  = v => `${v>=0?'+':''}₹${Math.abs(v).toLocaleString('en-IN',{maximumFractionDigits:0})} Cr`;
-  const fmtK = v => `${v>=0?'+':'-'}₹${(Math.abs(v)/100).toFixed(1)}K Cr`;
-
-  const bias  = fTot + dTot;
-  const bLabel= bias > 8000 ? '🟢 Strong Buying' : bias > 0 ? '🟡 Mild Buying' : bias > -8000 ? '🟠 Mild Selling' : '🔴 Strong Selling';
-  const bCol  = bias > 0 ? 'var(--green)' : 'var(--red)';
-  const bPct  = Math.min(Math.abs(bias)/25000*100, 100).toFixed(0);
-
+// FII/DII — direct links to official sources
+function rFII(){
   document.getElementById('area').innerHTML = `
-    <!-- Header -->
-    <div class="sh">🌍 FII / DII Tracker
-      <div class="sh-line"></div>
-      <span style="font-size:.63rem;font-weight:500;padding:2px 8px;border-radius:20px;
-        background:rgba(0,212,154,.1);color:var(--green);
-        border:1px solid rgba(0,212,154,.25)">
-        🟢 ${data.source||'NSE India'}
-      </span>
-      <span style="font-size:.6rem;color:var(--muted2)">
-        ${data.updated||''} ${data.age ? '· fetched '+data.age : ''}
-      </span>
+    <div class="sh">🌍 FII / DII Activity</div>
+
+    <div class="ibox" style="margin-bottom:16px">
+      FII/DII data is published daily by NSE, BSE and SEBI after market hours. Click any link below to view the latest official data.
     </div>
 
-    <!-- Summary cards -->
-    <div class="srow" style="margin-bottom:14px">
-      <div class="pill ${fLast>=0?'p-green':''}">
-        <strong style="color:${fCol(fLast)}">${fmt(fLast)}</strong>FII Today
-      </div>
-      ${hasDII ? `<div class="pill ${dLast>=0?'p-blue':''}">
-        <strong style="color:${fCol(dLast)}">${fmt(dLast)}</strong>DII Today
-      </div>` : ''}
-      <div class="pill">
-        <strong style="color:${fCol(fTot)}">${fmtK(fTot)}</strong>FII ${days.length}-Day
-      </div>
-      ${hasDII ? `<div class="pill">
-        <strong style="color:${fCol(dTot)}">${fmtK(dTot)}</strong>DII ${days.length}-Day
-      </div>` : ''}
-      <div class="pill">
-        <strong style="color:${fBuyDays>days.length/2?'var(--green)':'var(--red)'}">${fBuyDays}/${days.length}</strong>FII Buy Days
-      </div>
-    </div>
+    <!-- Primary Sources -->
+    <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Official Data Sources</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px">
 
-    <!-- Sentiment bar -->
-    <div class="cwrap" style="padding:14px;margin-bottom:14px">
-      <div style="font-size:.67rem;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
-        Institutional Sentiment (${days.length}-Day)
-      </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-        <div style="flex:1;height:10px;background:var(--border);border-radius:10px;overflow:hidden">
-          <div style="height:100%;width:${bPct}%;background:${bCol};border-radius:10px;transition:width .8s cubic-bezier(.4,0,.2,1)"></div>
+      <a href="https://www.nseindia.com/market-data/fii-dii-activity" target="_blank" class="fii-link-card">
+        <div class="flc-left">
+          <div class="flc-logo" style="background:rgba(0,162,255,.12);color:#00a2ff">NSE</div>
         </div>
-        <div style="font-size:.85rem;font-weight:800;color:${bCol};white-space:nowrap">${bLabel}</div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
-        <div style="background:var(--card2);border-radius:8px;padding:8px">
-          <div style="font-size:.9rem;font-weight:800;color:${fCol(fTot)}">${fmtK(fTot)}</div>
-          <div style="font-size:.6rem;color:var(--muted2);margin-top:2px">FII Net</div>
+        <div class="flc-body">
+          <div class="flc-name">NSE India — FII / DII Activity</div>
+          <div class="flc-desc">Daily FII & DII buy/sell data for Cash, F&O and Debt segments. Most detailed breakdown.</div>
         </div>
-        ${hasDII ? `<div style="background:var(--card2);border-radius:8px;padding:8px">
-          <div style="font-size:.9rem;font-weight:800;color:${fCol(dTot)}">${fmtK(dTot)}</div>
-          <div style="font-size:.6rem;color:var(--muted2);margin-top:2px">DII Net</div>
-        </div>` : '<div></div>'}
-        <div style="background:var(--card2);border-radius:8px;padding:8px">
-          <div style="font-size:.9rem;font-weight:800;color:${fCol(bias)}">${fmtK(bias)}</div>
-          <div style="font-size:.6rem;color:var(--muted2);margin-top:2px">Combined</div>
+        <div class="flc-arrow">→</div>
+      </a>
+
+      <a href="https://www.bseindia.com/markets/Equity/EQReports/FIIDIITradingActivity.aspx" target="_blank" class="fii-link-card">
+        <div class="flc-left">
+          <div class="flc-logo" style="background:rgba(255,100,0,.12);color:#ff6400">BSE</div>
         </div>
-      </div>
+        <div class="flc-body">
+          <div class="flc-name">BSE India — FII / DII Trading Activity</div>
+          <div class="flc-desc">BSE FII and DII net flows with historical data going back several years.</div>
+        </div>
+        <div class="flc-arrow">→</div>
+      </a>
+
+      <a href="https://www.sebi.gov.in/sebiweb/other/OtherAction.do?doFiiDii=yes" target="_blank" class="fii-link-card">
+        <div class="flc-left">
+          <div class="flc-logo" style="background:rgba(0,200,100,.12);color:#00c864">SEBI</div>
+        </div>
+        <div class="flc-body">
+          <div class="flc-name">SEBI — FPI / FII Daily Data</div>
+          <div class="flc-desc">Official SEBI Foreign Portfolio Investor daily buy/sell report. Primary regulatory source.</div>
+        </div>
+        <div class="flc-arrow">→</div>
+      </a>
     </div>
 
-    <!-- Chart -->
-    <div class="cwrap" style="margin-bottom:14px">
-      <div style="font-size:.67rem;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
-        Daily Net Flow · ₹ Crore
-      </div>
-      <div style="height:190px;position:relative"><canvas id="fC"></canvas></div>
-    </div>
+    <!-- Secondary / aggregators -->
+    <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Charts & Analysis</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
 
-    <!-- Table -->
-    <div class="cwrap" style="padding:0;overflow:hidden">
-      <div class="tw">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th style="color:var(--green)">FII Net</th>
-              ${hasDII ? '<th style="color:var(--blue)">DII Net</th>' : ''}
-              ${days[0]?.fiiBuy ? '<th>FII Buy</th><th>FII Sell</th>' : ''}
-              ${hasDII ? '<th>Combined</th>' : ''}
-            </tr>
-          </thead>
-          <tbody>
-            ${days.map(d => {
-              const f=+(d.fiiNet||0), di=+(d.diiNet||0), comb=f+di;
-              return `<tr>
-                <td style="font-size:.69rem;color:var(--muted2);white-space:nowrap">${d.d}</td>
-                <td style="color:${fCol(f)};font-weight:700;font-size:.75rem">${fmt(f)}</td>
-                ${hasDII ? `<td style="color:${fCol(di)};font-weight:700;font-size:.75rem">${fmt(di)}</td>` : ''}
-                ${d.fiiBuy ? `<td style="font-size:.69rem;color:var(--green)">₹${Math.abs(d.fiiBuy).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
-                              <td style="font-size:.69rem;color:var(--red)">₹${Math.abs(d.fiiSell||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>` : ''}
-                ${hasDII ? `<td style="color:${fCol(comb)};font-weight:600;font-size:.72rem">${fmt(comb)}</td>` : ''}
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <a href="https://www.moneycontrol.com/stocks/marketstats/fii_dii_activity/index.php" target="_blank" class="fii-link-card">
+        <div class="flc-left">
+          <div class="flc-logo" style="background:rgba(100,120,255,.12);color:#6478ff">MC</div>
+        </div>
+        <div class="flc-body">
+          <div class="flc-name">MoneyControl — FII / DII Tracker</div>
+          <div class="flc-desc">Interactive charts, 30-day trend, sector-wise FII flows and sentiment analysis.</div>
+        </div>
+        <div class="flc-arrow">→</div>
+      </a>
 
-    <!-- Refresh -->
-    <div style="text-align:center;margin-top:14px;padding-bottom:4px">
-      <button class="btn btn-out" style="font-size:.72rem" onclick="FII_TS=0;rFII()">🔄 Refresh</button>
-      <div style="font-size:.61rem;color:var(--muted);margin-top:6px">
-        FII/DII data updates after 6:30 PM IST each trading day · Source: ${data.source||'NSE India'}
-      </div>
+      <a href="https://www.tickertape.in/market-mood-index" target="_blank" class="fii-link-card">
+        <div class="flc-left">
+          <div class="flc-logo" style="background:rgba(240,180,40,.12);color:#f0b428">TT</div>
+        </div>
+        <div class="flc-body">
+          <div class="flc-name">Tickertape — Market Mood Index</div>
+          <div class="flc-desc">Combines FII activity, options data, momentum and breadth into one sentiment score.</div>
+        </div>
+        <div class="flc-arrow">→</div>
+      </a>
+
+      <a href="https://trendlyne.com/macro/fii-dii/" target="_blank" class="fii-link-card">
+        <div class="flc-left">
+          <div class="flc-logo" style="background:rgba(0,210,150,.12);color:#00d296">TL</div>
+        </div>
+        <div class="flc-body">
+          <div class="flc-name">Trendlyne — FII / DII Flows</div>
+          <div class="flc-desc">Daily and monthly FII/DII net flows with sector-level breakdown and charts.</div>
+        </div>
+        <div class="flc-arrow">→</div>
+      </a>
     </div>
   `;
-
-  // Chart
-  setTimeout(() => {
-    const c = document.getElementById('fC');
-    if (!c) return;
-    const labels = days.map(d => d.d).reverse();
-    const fnR = [...fn].reverse();
-    const dnR = [...dn].reverse();
-    const ds = [
-      { label:'FII Net', data:fnR,
-        backgroundColor:fnR.map(v=>v>=0?'rgba(0,212,154,.75)':'rgba(255,69,96,.75)'),
-        borderRadius:4, borderSkipped:false },
-    ];
-    if (hasDII) ds.push(
-      { label:'DII Net', data:dnR,
-        backgroundColor:dnR.map(v=>v>=0?'rgba(56,189,248,.65)':'rgba(251,146,60,.65)'),
-        borderRadius:4, borderSkipped:false }
-    );
-    new Chart(c.getContext('2d'), {
-      type:'bar',
-      data:{ labels, datasets:ds },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ labels:{ color:'#e2e8f5', font:{ size:9 } } } },
-        scales:{
-          x:{ ticks:{ color:'#6b7fa0', font:{ size:7 }, maxRotation:45 }, grid:{ color:'#1a2540' } },
-          y:{ ticks:{ color:'#6b7fa0', font:{ size:8 }, callback:v=>'₹'+v.toLocaleString('en-IN') },
-              grid:{ color:'#1a2540' } }
-        }
-      }
-    });
-  }, 50);
 }
 
-// Sector Rotation
-function rRot(){const sd=getSD();const st={Accumulation:[],Markup:[],Distribution:[],Decline:[]};sd.forEach(s=>{if(s.avgW>2)st.Markup.push(s);else if(s.avgW>0&&s.avgW<=2)st.Accumulation.push(s);else if(s.avgW<-2)st.Decline.push(s);else st.Distribution.push(s);});document.getElementById('area').innerHTML=`<div class="sh">🔁 Sector Rotation (Weinstein Stages)</div><div class="stg"><div class="stc sta"><div style="font-size:.76rem;font-weight:700;color:var(--green);margin-bottom:5px">📦 Accumulation (${st.Accumulation.length})</div><div style="font-size:.68rem;color:var(--muted)">${st.Accumulation.map(s=>`${s.name} <span style="color:var(--green)">+${s.avgW.toFixed(1)}%</span>`).join(' &nbsp; ')||'None'}</div></div><div class="stc stm"><div style="font-size:.76rem;font-weight:700;color:var(--blue);margin-bottom:5px">🚀 Markup (${st.Markup.length})</div><div style="font-size:.68rem;color:var(--muted)">${st.Markup.map(s=>`${s.name} <span style="color:var(--blue)">+${s.avgW.toFixed(1)}%</span>`).join(' &nbsp; ')||'None'}</div></div><div class="stc std"><div style="font-size:.76rem;font-weight:700;color:var(--yellow);margin-bottom:5px">🔔 Distribution (${st.Distribution.length})</div><div style="font-size:.68rem;color:var(--muted)">${st.Distribution.map(s=>`${s.name} <span style="color:var(--yellow)">${s.avgW.toFixed(1)}%</span>`).join(' &nbsp; ')||'None'}</div></div><div class="stc stk"><div style="font-size:.76rem;font-weight:700;color:var(--red);margin-bottom:5px">📉 Decline (${st.Decline.length})</div><div style="font-size:.68rem;color:var(--muted)">${st.Decline.map(s=>`${s.name} <span style="color:var(--red)">${s.avgW.toFixed(1)}%</span>`).join(' &nbsp; ')||'None'}</div></div></div><div class="sh" style="margin-top:16px">Scatter: Day% vs Week%</div><div class="cwrap"><div style="height:240px;position:relative"><canvas id="rC"></canvas></div></div>`;setTimeout(()=>{const c=document.getElementById('rC');if(!c)return;new Chart(c.getContext('2d'),{type:'scatter',data:{datasets:[{label:'Sectors',data:sd.map(s=>({x:+s.avgD.toFixed(2),y:+s.avgW.toFixed(2),sym:s.name})),backgroundColor:sd.map(s=>SC[s.name]||'#636e72'),pointRadius:7}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw.sym}: D${ctx.raw.x>0?'+':''}${ctx.raw.x}% W${ctx.raw.y>0?'+':''}${ctx.raw.y}%`}}},scales:{x:{title:{display:true,text:'Day %',color:'#7a7f9a'},ticks:{color:'#7a7f9a',font:{size:8}},grid:{color:'#1e2340'}},y:{title:{display:true,text:'Week %',color:'#7a7f9a'},ticks:{color:'#7a7f9a',font:{size:8}},grid:{color:'#1e2340'}}}}});},50);}
 
-// Calendar
+// ── INVESTMENT VIEW ────────────────────────────────────────────────────────────
+// ── Investment scoring using live price/momentum data ─────────────────────────
+function scoreInvStock(sym) {
+  // Find stock in the already-loaded AS array
+  const s = AS.find(x => x.symbol === sym);
+  if (!s || !s.c || s.c.length < 50) return null;
+
+  const c = s.c, v = s.v || [], n = c.length;
+  const price = c[n-1];
+
+  // EMA helper
+  const ema = (arr, p) => {
+    const k = 2/(p+1); let e = arr[0];
+    for (let i=1;i<arr.length;i++) e = arr[i]*k + e*(1-k);
+    return e;
+  };
+
+  const e20  = ema(c.slice(-20), 20);
+  const e50  = ema(c.slice(-50), 50);
+  const e200 = ema(c.slice(-200), 200);
+
+  // RSI(14)
+  const rsi = rc(c, 14) || 50;
+
+  // 52-week high/low position (0-100%)
+  const hi52 = Math.max(...c.slice(-252));
+  const lo52 = Math.min(...c.slice(-252));
+  const pos52 = hi52 > lo52 ? ((price - lo52)/(hi52 - lo52))*100 : 50;
+
+  // 6-month return
+  const ret6m = c.length >= 126 ? ((price / c[n-126]) - 1)*100 : 0;
+
+  // 1-year return
+  const ret1y = c.length >= 252 ? ((price / c[n-252]) - 1)*100 : 0;
+
+  // Volume trend (recent 20 vs prior 20)
+  const vAvgR = v.slice(-20).reduce((a,b)=>a+b,0)/20;
+  const vAvgP = v.slice(-40,-20).reduce((a,b)=>a+b,0)/20;
+  const volTrend = vAvgP > 0 ? vAvgR/vAvgP : 1;
+
+  // Trend strength score (0-100)
+  let score = 0;
+  if (price > e20)  score += 15;   // above short-term MA
+  if (price > e50)  score += 20;   // above medium-term MA
+  if (price > e200) score += 25;   // above long-term MA (most important for investors)
+  if (e50  > e200)  score += 10;   // golden cross
+  if (e20  > e50)   score += 5;    // short above medium
+  if (pos52 > 50)   score += 10;   // in upper half of 52-week range
+  if (ret6m > 0)    score += 5;    // positive 6-month trend
+  if (ret1y > 0)    score += 5;    // positive 1-year trend
+  if (volTrend > 1) score += 5;    // volume expanding
+
+  // Signal label
+  const label = score >= 75 ? 'Strong Uptrend'
+               : score >= 55 ? 'Uptrend'
+               : score >= 35 ? 'Neutral'
+               : score >= 20 ? 'Downtrend'
+               : 'Weak';
+
+  const col = score >= 55 ? 'var(--green)'
+            : score >= 35 ? 'var(--yellow)'
+            : 'var(--red)';
+
+  return { score, label, col, price, e20, e50, e200, rsi: Math.round(rsi),
+           ret6m: ret6m.toFixed(1), ret1y: ret1y.toFixed(1), pos52: Math.round(pos52) };
+}
+
+function rInv() {
+  const area = document.getElementById('area');
+  const hasData = AS.length > 0;
+
+  const STRATEGIES = [
+    { key:'qgarp',          emoji:'📈', name:'Quality at Reasonable Price (QARP)',   color:'#a78bfa',
+      desc:'Focus on companies with consistent ROE >15%, low debt, predictable earnings growth. Buy at reasonable valuations (PEG < 1.5). Championed by Peter Lynch & Warren Buffett.' },
+    { key:'canslim',        emoji:'🚀', name:'CANSLIM (William O&#39;Neil)',             color:'#00d49a',
+      desc:'Current earnings surge, Annual growth, New product/management/high, Supply/demand, Leader in sector, Institutional buying, Market direction. Combines fundamentals + technicals.' },
+    { key:'dvd',            emoji:'💰', name:'Dividend Compounding',                  color:'#f0b428',
+      desc:'High-quality businesses with 10+ year dividend growth track record, low payout ratio (<50%), strong FCF. Reinvest dividends for compounding. Best for capital preservation.' },
+    { key:'smallcap_growth',emoji:'🌱', name:'Small Cap Emerging Leaders',            color:'#ff6b6b',
+      desc:'Identify future midcap/largecap leaders early. Look for niche monopoly, promoter skin-in-the-game, revenue growth >25% YoY, expanding TAM, debt-free or low-debt balance sheet.' },
+    { key:'sector_leader',  emoji:'🏆', name:'Sector Leaders / Moat Plays',          color:'#4f8ef7',
+      desc:'Dominant companies with durable competitive moats — cost advantage, network effects, switching costs or intangibles. Buy during broad market corrections. Hold 5-10 years.' },
+  ];
+
+  const PICKS = {
+    largecap: {
+      label:'Large Cap', emoji:'🏛️', color:'rgba(79,142,247,.15)', rankBg:'#4f8ef7',
+      stocks:[
+        { sym:'HDFCBANK',   strat:'QARP',           reason:'India&#39;s largest private bank by assets. Consistent 16-18% ROE for 15+ years, best-in-class asset quality (NPA <1.5%), fortress balance sheet. Structural beneficiary of India&#39;s credit growth story.' },
+        { sym:'RELIANCE',   strat:'Sector Leader',   reason:'Dominant across Telecom (Jio #1), Retail (largest in India), and legacy O2C. Jio Financial Services is a new growth engine. Promoter owns 49%, strong free cash flow generation.' },
+        { sym:'TCS',        strat:'QARP + Moat',     reason:'World-class IT services franchise with sticky Fortune-500 client base. 30%+ EBITDA margins, near-zero debt, Rs 40,000 Cr+ annual FCF. Steady 12-15% earnings CAGR.' },
+        { sym:'SUNPHARMA',  strat:'Sector Leader',   reason:'India&#39;s largest pharma by market cap. US specialty business turning profitable, domestic formulations growing 10-12%. R&D pipeline of 100+ ANDAs de-risks growth.' },
+        { sym:'MARUTI',     strat:'QARP + Dividend', reason:'57% market share in passenger vehicles — unmatched distribution moat. Strong FCF, net cash balance sheet, transitioning to CNG/hybrids/EVs.' },
+      ]
+    },
+    midcap: {
+      label:'Mid Cap', emoji:'🏢', color:'rgba(0,212,154,.15)', rankBg:'#00d49a',
+      stocks:[
+        { sym:'DIXON',      strat:'Emerging Leader', reason:'India&#39;s largest electronics EMS company. Riding PLI tailwinds — phones, LED TV, washing machines. Revenue 5x in 4 years. Expanding into laptops and IT hardware.' },
+        { sym:'POLYCAB',    strat:'QARP',            reason:'#1 wires & cables brand in India with 25% market share. Premiumisation driving margins higher. Clean balance sheet, improving return ratios, consistent dividend payer.' },
+        { sym:'ALKYLAMINE', strat:'Niche Moat',      reason:'Speciality amines manufacturer — 70%+ domestic market share in many products. High barriers to entry. China+1 export opportunity expanding.' },
+        { sym:'APLAPOLLO',  strat:'Sector Leader',   reason:'Largest structural steel tube manufacturer in Asia. Brand pricing power over commodity peers. Expanding to Tier 2/3 cities, new product lines driving volume + margin expansion.' },
+        { sym:'CROMPTON',   strat:'QARP + Dividend', reason:'#2 in fans, strong in pumps and lighting. Post-Butterfly acquisition offers kitchen appliances growth. Improving margins post integration, attractive free cash flow yield.' },
+      ]
+    },
+    smallcap: {
+      label:'Small Cap', emoji:'🌱', color:'rgba(255,107,107,.15)', rankBg:'#ff6b6b',
+      stocks:[
+        { sym:'EPIGRAL',    strat:'Emerging Leader',   reason:'Chlor-alkali + EDC manufacturer in Gujarat with capacity expansion in progress. Direct beneficiary of China chemical supply disruption. Low-cost producer.' },
+        { sym:'GARFIBRES',  strat:'Niche Moat',        reason:'Only large-scale manufacturer of nylon tyre cord fabric in India. Auto OEM relationships are sticky. Import substitution moat. Capacity expansion in progress.' },
+        { sym:'GOKUL',      strat:'Small Cap Growth',  reason:'Agri-processing and edible oils — beneficiary of India&#39;s food supply chain formalisation. Expanding refining capacity, consistent revenue growth.' },
+        { sym:'MSTCLTD',    strat:'Emerging Platform', reason:'Govt-backed e-commerce & e-auction platform. Asset-light model, near-monopoly in public sector e-procurement. Strong cash position, debt-free, dividend paying.' },
+        { sym:'SEQUENT',    strat:'Niche Pharma',      reason:'Animal health API manufacturer — underpenetrated global market. Compliant US FDA facilities, growing EU business. Balance sheet improving after deleveraging.' },
+      ]
+    }
+  };
+
+  // Score and sort each cap group if data is available
+  const scoredPicks = {};
+  for (const [key, cap] of Object.entries(PICKS)) {
+    let stocks = cap.stocks.map(s => ({ ...s, sc: scoreInvStock(s.sym) }));
+    // Sort by score descending if we have live data
+    if (hasData) stocks = stocks.sort((a,b) => (b.sc?.score||0) - (a.sc?.score||0));
+    scoredPicks[key] = { ...cap, stocks };
+  }
+
+  const strat5HTML = STRATEGIES.map(s => `
+    <div class="cwrap" style="padding:13px;margin-bottom:10px;border-left:3px solid ${s.color}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <span style="font-size:1.1rem">${s.emoji}</span>
+        <span style="font-size:.78rem;font-weight:700;color:var(--text)">${s.name}</span>
+      </div>
+      <div style="font-size:.68rem;color:var(--muted2);line-height:1.5">${s.desc}</div>
+    </div>`).join('');
+
+  const capHTML = Object.values(scoredPicks).map(cap => `
+    <div class="inv-cap-block">
+      <div class="inv-cap-header" style="background:${cap.color}">
+        <span style="font-size:1.1rem">${cap.emoji}</span>
+        <span>${cap.label} — Top 5 Long-Term Picks</span>
+        ${hasData ? '<span style="font-size:.6rem;color:var(--green);margin-left:auto">⚡ Live scored</span>' : '<span style="font-size:.6rem;color:var(--muted2);margin-left:auto">Load data to score</span>'}
+      </div>
+      ${cap.stocks.map((s,i) => {
+        const sc = s.sc;
+        const scoreBar = sc
+          ? `<div style="margin-top:5px">
+               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                 <span style="font-size:.62rem;font-weight:700;color:${sc.col}">${sc.label}</span>
+                 <span style="font-size:.62rem;color:var(--muted2)">RSI ${sc.rsi} · ${sc.ret6m}% (6M) · ${sc.ret1y}% (1Y)</span>
+               </div>
+               <div style="height:4px;background:var(--border);border-radius:4px;overflow:hidden">
+                 <div style="height:100%;width:${sc.score}%;background:${sc.col};border-radius:4px;transition:width .7s"></div>
+               </div>
+             </div>`
+          : '';
+        return `
+        <div class="inv-stock-row">
+          <div class="inv-rank" style="background:${cap.rankBg};color:#fff">${i+1}</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+              <span class="inv-sym">${s.sym}</span>
+              ${sc ? `<span style="font-size:.73rem;font-weight:700;color:var(--text)">₹${sc.price.toFixed(1)}</span>` : ''}
+              <span class="inv-tag" style="background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.2)">${s.strat}</span>
+              <a href="https://www.screener.in/company/${s.sym}/" target="_blank"
+                 style="font-size:.62rem;padding:1px 7px;border-radius:8px;background:rgba(79,142,247,.12);color:#4f8ef7;border:1px solid rgba(79,142,247,.2);text-decoration:none;white-space:nowrap">
+                📊 Screener.in
+              </a>
+            </div>
+            <div class="inv-reason">${s.reason}</div>
+            ${scoreBar}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+
+  area.innerHTML = `
+    <div class="sh">💎 Long-Term Investment Guide
+      <div class="sh-line"></div>
+      <span style="font-size:.63rem;color:var(--muted2);font-weight:400">Horizon: 3–10 Years</span>
+    </div>
+
+    <div class="ibox" style="margin-bottom:16px">
+      ⚠️ <strong>Not financial advice.</strong> Research starting points only. Always do your own due diligence.
+      ${!hasData ? ' · <strong style="color:var(--yellow)">Tap ⚡ Load to score & re-rank stocks live.</strong>' : ''}
+    </div>
+
+    <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">5 Proven Investment Strategies</div>
+    ${strat5HTML}
+
+    <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin:18px 0 10px">
+      Curated Picks · ${hasData ? 'Re-ranked by Live Momentum Score' : 'Load Data to Enable Live Scoring'}
+    </div>
+    ${capHTML}
+
+    <div style="font-size:.62rem;color:var(--muted);text-align:center;margin-top:10px;padding-bottom:4px;line-height:1.6">
+      Momentum score uses price vs EMA20/50/200, RSI, 52-week position & volume trend from live data.<br>
+      Fundamental thesis is static — use Screener.in links for latest financials.
+    </div>
+  `;
+}
+
+
 function rCal(){const ev=[{d:5,m:'Mar',e:'RBI MPC Day 1',desc:`Policy meeting begins`,i:'H'},{d:7,m:'Mar',e:'RBI Rate Decision',desc:`Repo rate & commentary`,i:'H'},{d:10,m:'Mar',e:'CPI Inflation',desc:`Feb 2026 data`,i:'H'},{d:12,m:'Mar',e:'IIP Data',desc:`Jan 2026 industrial output`,i:'M'},{d:14,m:'Mar',e:'US FOMC Minutes',desc:`Impact on FII flows`,i:'M'},{d:20,m:'Mar',e:'F&O Expiry Week',desc:`Monthly derivatives — volatility`,i:'H'},{d:27,m:'Mar',e:'Monthly F&O Expiry',desc:`March 2026 contracts expire`,i:'H'},{d:28,m:'Mar',e:'GDP Q3 Data',desc:`Oct-Dec 2025 growth`,i:'H'},{d:31,m:'Mar',e:'FY2026 Year End',desc:`Last trading day of FY26`,i:'H'}];document.getElementById('area').innerHTML=`<div class="sh">📅 Economic Calendar</div>${ev.map(e=>`<div class="ci"><div class="cd"><div style="font-size:.84rem;font-weight:700;color:var(--accent)">${e.d}</div><div style="font-size:.62rem;color:var(--muted)">${e.m}</div></div><div><div style="font-size:.77rem;color:var(--text);font-weight:600">${e.e}<span style="font-size:.6rem;padding:1px 5px;border-radius:9px;font-weight:600;margin-left:5px;${e.i==='H'?'background:rgba(255,79,106,.15);color:var(--red)':e.i==='M'?'background:rgba(245,197,24,.15);color:var(--yellow)':'background:rgba(0,200,150,.15);color:var(--green)'}">${e.i}</span></div><div style="font-size:.68rem;color:var(--muted);margin-top:2px">${e.desc}</div></div></div>`).join('')}`;}
 
 // News

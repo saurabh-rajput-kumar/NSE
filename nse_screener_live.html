@@ -1681,28 +1681,15 @@ async function rFII() {
     FII_CACHE = data; FII_TS = now;
     renderFII(data);
   } catch(e) {
-    // Proxy might be old version — show helpful message + fallback data
     console.warn('FII fetch failed:', e.message);
-    renderFII(getFIIFallback());
+    renderFII({ live: false, error: true, source: 'Server unreachable', days: [] });
   }
 }
 
 function getFIIFallback() {
-  // Clearly-labelled fallback so user knows it's not live
-  return {
-    live: false,
-    source: 'Fallback (update proxy to get live data)',
-    days: [
-      {d:'10-Mar-26',fiiNet:-1240,diiNet:980},
-      {d:'07-Mar-26',fiiNet:2310,diiNet:-540},
-      {d:'06-Mar-26',fiiNet:-890,diiNet:1200},
-      {d:'05-Mar-26',fiiNet:1560,diiNet:-320},
-      {d:'04-Mar-26',fiiNet:-2100,diiNet:1890},
-      {d:'03-Mar-26',fiiNet:343,diiNet:233},
-      {d:'28-Feb-26',fiiNet:-1100,diiNet:1200},
-      {d:'27-Feb-26',fiiNet:1800,diiNet:-200},
-    ]
-  };
+  // Called when the server-side fetch fails entirely
+  // Return empty so renderFII shows the proper retry screen
+  return { live: false, error: true, source: 'NSE unavailable', days: [] };
 }
 
 function renderFII(data) {

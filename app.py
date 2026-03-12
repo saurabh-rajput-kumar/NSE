@@ -296,3 +296,57 @@ def wa_triggered():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+
+# ── Visitor tracking ───────────────────────────────────────────────────────────
+import hashlib
+from collections import defaultdict
+
+_visitor_lock = threading.Lock()
+_visitors = {
+    "today_date":  "",
+    "today_ips":   set(),
+    "active":      {},   # ip_hash -> last_seen timestamp
+}
+_ACTIVE_TIMEOUT = 300   # seconds — "live" if seen in last 5 min
+
+
+def _visitor_ip(req) -> str:
+    """Anonymised visitor fingerprint (hashed IP)."""
+    raw = req.headers.get("X-Forwarded-For", req.remote_addr or "unknown")
+    ip  = raw.split(",")[0].strip()
+    return hashlib.sha256(ip.encode()).hexdigest()[:16]
+
+
+def _record_visit(req):
+    now      = time.time()
+    today    = datetime.utcnow().strftime("%Y-%m-%d")
+    ip_hash  = _visitor_ip(req)
+    with _visitor_lock:
+        # Roll daily counter at midnight UTC
+        if _visitors["today_date"] != today:
+            _visitors["today_date"] = today
+            _visitors["today_ips"]  = set()
+        _visitors["today_ips"].add(ip_hash)
+        _visitors["active"][ip_hash] = now
+        # Prune stale active sessions
+        cutoff = now - _ACTIVE_TIMEOUT
+        _visitors["active"] = {k: v for k, v in _visitors["active"].items() if v >= cutoff}
+
+
+@app.before_request
+def track_visitor():
+    # Don't count health/asset requests
+    if freq.path in ("/api/health", "/api/visitors") or freq.path.startswith("/static"):
+        return
+    _record_visit(freq)
+
+
+@app.route("/api/visitors")
+def visitors():
+    now = time.time()
+    with _visitor_lock:
+        cutoff = now - _ACTIVE_TIMEOUT
+        live   = sum(1 for v in _visitors["active"].values() if v >= cutoff)
+        today  = len(_visitors["today_ips"])
+    return jsonify({"live": live, "today": today})

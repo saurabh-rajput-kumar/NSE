@@ -2329,7 +2329,293 @@ function rCal(){const ev=[{d:5,m:'Mar',e:'RBI MPC Day 1',desc:`Policy meeting be
 function rNews(){if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty">Load data first.</div>`;return;}const ws=WL.length?WL:AS.slice(0,8).map(s=>s.symbol);const T=[(s,p)=>`${s} Q3 PAT up 18% YoY — brokerages raise target to ₹${(p*1.15).toFixed(0)}`,(s,p)=>`${s} secures ₹2,400Cr order from NTPC`,(s,p)=>`FII net buying ₹320Cr in ${s} — 5 sessions`,(s,p)=>`${s} buyback at ₹${(p*1.08).toFixed(0)} — 10% premium`,(s,p)=>`Block deal: ${s} 2.1% stake at ₹${(p*0.98).toFixed(0)}`,(s,p)=>`${s} FY26 guidance maintained`,(s,p)=>`Promoter raises ${s} stake by 1.5%`,(s,p)=>`${s} board approves 1:2 bonus shares`];const dates=['3 Mar','2 Mar','1 Mar','28 Feb','27 Feb'];const items=[];ws.slice(0,10).forEach((sym,i)=>{const s=AS.find(x=>x.symbol===sym);if(!s)return;items.push({sym,title:T[i%T.length](sym,s.price),date:dates[i%dates.length]});});document.getElementById('area').innerHTML=`<div class="sh">📰 News Feed</div><div class="ibox">Live news: <a href="https://www.moneycontrol.com/news/business/stocks/" target="_blank" style="color:var(--accent)">Moneycontrol</a> | <a href="https://economictimes.indiatimes.com/markets/stocks/news" target="_blank" style="color:var(--accent)">Economic Times</a> | <a href="https://www.nseindia.com/companies-listing/corporate-filings-announcements" target="_blank" style="color:var(--accent)">NSE Announcements</a></div>${items.map(n=>`<div class="ni"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:.69rem;font-weight:700;color:var(--accent)">📌 ${n.sym}</span><span style="font-size:.63rem;color:var(--muted)">${n.date}</span></div><div style="font-size:.76rem">${n.title}</div></div>`).join('')}`;}
 
 // Backtest
-function rBT(){if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty">Load data first.</div>`;return;}let w2=0,l2=0,w5=0,l5=0,t2=0,t5=0,r2=0,r5=0;const res=[];AS.forEach(s=>{const sp=s.spark;if(sp.length<15)return;const{score:sc2}=s2w(s),{score:sc5}=s5d(s);if(sc2>=60){const e=sp[5],x=sp[sp.length-1],r=((x-e)/e)*100;r>0?w2++:l2++;t2++;r2+=r;res.push({sym:s.symbol,score:sc2,e:e.toFixed(1),x:x.toFixed(1),r:r.toFixed(2)});}if(sc5>=60){const e=sp[sp.length-6],x=sp[sp.length-1],r=((x-e)/e)*100;r>0?w5++:l5++;t5++;r5+=r;}});document.getElementById('area').innerHTML=`<div class="sh">🔁 Backtester (Last 20 Days)</div><div class="srow"><div class="bts"><div class="btv">${t2>0?((w2/t2)*100).toFixed(1):0}%</div><div class="btl">2-4W Win Rate</div></div><div class="bts"><div class="btv">${t5>0?((w5/t5)*100).toFixed(1):0}%</div><div class="btl">5-Day Win Rate</div></div><div class="bts"><div class="btv" style="color:${r2/t2>0?'var(--green)':'var(--red)'}">${t2>0?(r2/t2).toFixed(2):0}%</div><div class="btl">2-4W Avg Ret</div></div><div class="bts"><div class="btv" style="color:${r5/t5>0?'var(--green)':'var(--red)'}">${t5>0?(r5/t5).toFixed(2):0}%</div><div class="btl">5-Day Avg Ret</div></div><div class="bts"><div class="btv">${w2}/${t2}</div><div class="btl">2-4W W/L</div></div><div class="bts"><div class="btv">${w5}/${t5}</div><div class="btl">5-Day W/L</div></div></div><div class="sh">Individual Results</div><div class="tw"><table><thead><tr><th>Symbol</th><th>Score</th><th>Entry</th><th>Exit</th><th>Return</th><th>Result</th></tr></thead><tbody>${res.slice(0,30).map(r=>`<tr><td><strong>${r.sym}</strong></td><td>${r.score}%</td><td>₹${r.e}</td><td>₹${r.x}</td><td style="color:${r.r>0?'var(--green)':'var(--red)'};font-weight:700">${r.r>0?'+':''}${r.r}%</td><td><span class="tag ${r.r>0?'tl':'ts'}">${r.r>0?'WIN':'LOSS'}</span></td></tr>`).join('')}</tbody></table></div>`;}
+function rBT() {
+  const area = document.getElementById('area');
+  if (!AS.length) {
+    area.innerHTML = `<div class="empty">⚡ Load data first, then run backtest.</div>`;
+    return;
+  }
+
+  // ── Timeframe config ──────────────────────────────────────────────────────
+  const TF_CFG = {
+    '5d':  { label:'5-Day Momentum',  lookback: 20,  hold: 5,   period:'4 weeks',   minBars:25  },
+    '2w':  { label:'2–4 Week Swing',  lookback: 80,  hold: 14,  period:'16 weeks',  minBars:100 },
+    'pos': { label:'Positional',      lookback: 504, hold: 63,  period:'3 years',   minBars:520 },
+    'inv': { label:'Investment',      lookback: 252, hold: 63,  period:'1 year',    minBars:270 },
+  };
+
+  const tf  = ACTIVE_TF === 'inv' ? '2w' : ACTIVE_TF;   // inv falls back to 2w for bt
+  const cfg = TF_CFG[tf] || TF_CFG['2w'];
+  const strats = getStrats(tf);
+  const stratKey = ACTIVE_SUBSTRAT in strats ? ACTIVE_SUBSTRAT : Object.keys(strats)[0];
+  const strat = strats[stratKey];
+
+  // ── Score each stock at a historical point & simulate entry/exit ──────────
+  const results = [];
+
+  AS.forEach(s => {
+    const dc = s.daily?.c, dh = s.daily?.h, dl = s.daily?.l, dv = s.daily?.v;
+    if (!dc || dc.length < cfg.minBars) return;
+
+    const n = dc.length;
+    // Entry point: cfg.lookback bars ago
+    const entryIdx  = n - cfg.lookback;
+    const exitIdx   = Math.min(entryIdx + cfg.hold, n - 1);
+
+    if (entryIdx < 20) return;   // not enough history
+
+    // Build a "snapshot" stock object at entryIdx so we can re-score historically
+    const c_ = dc.slice(0, entryIdx + 1);
+    const h_ = dh.slice(0, entryIdx + 1);
+    const l_ = dl.slice(0, entryIdx + 1);
+    const v_ = dv.slice(0, entryIdx + 1);
+
+    if (c_.length < 22) return;
+
+    const entryPrice = c_[c_.length - 1];
+    const exitPrice  = dc[exitIdx];
+
+    if (!entryPrice || !exitPrice) return;
+
+    // Rebuild stock snapshot for scoring
+    const snap = {
+      ...s,
+      price:    entryPrice,
+      e20:      ec(c_.slice(-25), 20),
+      e50:      c_.length >= 55 ? ec(c_.slice(-55), 50) : entryPrice,
+      rsi:      rc(c_.slice(-20), 14),
+      bb:       bbc(c_.slice(-20), 20),
+      volRatio: (() => {
+        const avgV = v_.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
+        return (v_[v_.length-1] || avgV) / avgV;
+      })(),
+      pct52:    (() => {
+        const w = c_.slice(-252), hi = Math.max(...w), lo = Math.min(...w);
+        return hi !== lo ? ((entryPrice - lo)/(hi - lo))*100 : 50;
+      })(),
+      h52:      Math.max(...c_.slice(-252)),
+      l52:      Math.min(...c_.slice(-252)),
+      redDays:  (() => { let r=0; for(let i=c_.length-1;i>0;i--){if(c_[i]<c_[i-1])r++;else break;} return r; })(),
+      weekChg:  c_.length >= 6 ? ((entryPrice - c_[c_.length-6])/c_[c_.length-6])*100 : 0,
+      sr:       src(c_, h_, l_, entryPrice),
+      daily:    { c: c_, h: h_, l: l_, v: v_ },
+      weekly:   (() => {
+        const wk = [];
+        for (let i=0; i+4 < c_.length; i+=5) {
+          const wc=c_.slice(i,i+5),wh=h_.slice(i,i+5),wl=l_.slice(i,i+5),wv=v_.slice(i,i+5);
+          wk.push({ o:c_[i], h:Math.max(...wh), l:Math.min(...wl), c:wc[wc.length-1], v:wv.reduce((a,b)=>a+b,0) });
+        }
+        return wk;
+      })(),
+      spark: c_.slice(-20),
+      avgVol: v_.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1,
+      lastVol: v_[v_.length-1] || 0,
+    };
+
+    // Score at entry point
+    const savedTF = ACTIVE_TF, savedSS = ACTIVE_SUBSTRAT;
+    ACTIVE_TF = tf; ACTIVE_SUBSTRAT = stratKey;
+    const scored = scoreStock(snap);
+    ACTIVE_TF = savedTF; ACTIVE_SUBSTRAT = savedSS;
+
+    if (scored.score < 50) return;  // only backtest stocks that would have been selected
+
+    // R:R at entry
+    const rr = scored.rrData;
+
+    // Actual P/L
+    const retPct  = ((exitPrice - entryPrice) / entryPrice) * 100;
+    const won     = retPct > 0;
+
+    // Stop-loss hit check (did price breach stop before exit?)
+    let slHit = false, slHitDay = null;
+    if (rr?.stop) {
+      for (let i = entryIdx+1; i <= exitIdx; i++) {
+        if (dl[i] <= rr.stop) { slHit = true; slHitDay = i - entryIdx; break; }
+      }
+    }
+
+    // Target hit check
+    let tgtHit = false, tgtHitDay = null;
+    if (rr?.target) {
+      for (let i = entryIdx+1; i <= exitIdx; i++) {
+        if (dh[i] >= rr.target) { tgtHit = true; tgtHitDay = i - entryIdx; break; }
+      }
+    }
+
+    // Effective exit: if SL hit before target, SL defines outcome
+    let effectiveExit = exitPrice;
+    let exitReason = `Hold ${cfg.hold}d exit`;
+    if (slHit && (!tgtHit || slHitDay < tgtHitDay)) {
+      effectiveExit = rr.stop;
+      exitReason    = `Stop-loss hit (day ${slHitDay})`;
+    } else if (tgtHit) {
+      effectiveExit = rr.target;
+      exitReason    = `Target hit (day ${tgtHitDay})`;
+    }
+    const effectiveRet = ((effectiveExit - entryPrice) / entryPrice) * 100;
+
+    // Entry reason from top passing checks
+    const whyEnter = scored.checks.filter(ch => ch.pass).slice(0,3).map(ch => ch.label).join(' · ');
+
+    results.push({
+      sym:         s.symbol,
+      name:        s.name,
+      score:       scored.score,
+      entryPrice:  entryPrice,
+      exitPrice:   effectiveExit,
+      rawExit:     exitPrice,
+      retPct:      +effectiveRet.toFixed(2),
+      won:         effectiveRet > 0,
+      slHit,
+      tgtHit,
+      exitReason,
+      entryReason: whyEnter || scored.strat?.name || '',
+      stop:        rr?.stop  ? +rr.stop.toFixed(1)   : null,
+      target:      rr?.target ? +rr.target.toFixed(1) : null,
+      rrRatio:     rr?.rr    ? +rr.rr.toFixed(1)     : null,
+      entryIdx,
+      exitIdx,
+    });
+  });
+
+  if (!results.length) {
+    area.innerHTML = `<div class="empty">No stocks passed the strategy filter for this backtest period. Try loading more data or switching strategy.</div>`;
+    return;
+  }
+
+  // Sort by absolute return for display
+  results.sort((a,b) => b.retPct - a.retPct);
+
+  // ── Summary stats ──────────────────────────────────────────────────────────
+  const wins     = results.filter(r => r.won);
+  const losses   = results.filter(r => !r.won);
+  const winRate  = (wins.length / results.length * 100).toFixed(1);
+  const avgWin   = wins.length   ? (wins.reduce((a,r)=>a+r.retPct,0)/wins.length).toFixed(2)   : '0';
+  const avgLoss  = losses.length ? (losses.reduce((a,r)=>a+r.retPct,0)/losses.length).toFixed(2): '0';
+  const avgRet   = (results.reduce((a,r)=>a+r.retPct,0)/results.length).toFixed(2);
+  const pfactor  = losses.length && +avgLoss !== 0
+    ? Math.abs((wins.length * +avgWin) / (losses.length * +avgLoss)).toFixed(2)
+    : '∞';
+  const slCount  = results.filter(r=>r.slHit && !r.tgtHit).length;
+  const tgtCount = results.filter(r=>r.tgtHit).length;
+
+  const fCol = v => +v >= 0 ? 'var(--green)' : 'var(--red)';
+  const fmt  = v => `${+v>=0?'+':''}${v}%`;
+
+  area.innerHTML = `
+    <div class="sh">🔁 Backtest — ${strat?.name || stratKey}
+      <div class="sh-line"></div>
+      <span style="font-size:.63rem;color:var(--muted2)">${cfg.label} · Last ${cfg.period}</span>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="srow" style="flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      <div class="bts" style="flex:1;min-width:90px">
+        <div class="btv" style="color:${+winRate>=55?'var(--green)':+winRate>=45?'var(--yellow)':'var(--red)'}">${winRate}%</div>
+        <div class="btl">Win Rate</div>
+      </div>
+      <div class="bts" style="flex:1;min-width:90px">
+        <div class="btv" style="color:${fCol(avgRet)}">${fmt(avgRet)}</div>
+        <div class="btl">Avg Return</div>
+      </div>
+      <div class="bts" style="flex:1;min-width:90px">
+        <div class="btv" style="color:var(--green)">${fmt(avgWin)}</div>
+        <div class="btl">Avg Win</div>
+      </div>
+      <div class="bts" style="flex:1;min-width:90px">
+        <div class="btv" style="color:var(--red)">${fmt(avgLoss)}</div>
+        <div class="btl">Avg Loss</div>
+      </div>
+      <div class="bts" style="flex:1;min-width:90px">
+        <div class="btv" style="color:${+pfactor>=2?'var(--green)':+pfactor>=1?'var(--yellow)':'var(--red)'}">${pfactor}x</div>
+        <div class="btl">Profit Factor</div>
+      </div>
+      <div class="bts" style="flex:1;min-width:90px">
+        <div class="btv">${wins.length}W · ${losses.length}L</div>
+        <div class="btl">of ${results.length} signals</div>
+      </div>
+    </div>
+
+    <!-- Bar chart: distribution -->
+    <div class="cwrap" style="margin-bottom:14px">
+      <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+        Return Distribution — top signals
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        ${results.slice(0,15).map(r => {
+          const barW = Math.min(Math.abs(r.retPct) * 3, 100);
+          return `<div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:.68rem;font-weight:700;color:var(--text);min-width:80px">${r.sym}</span>
+            <div style="flex:1;height:14px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${barW}%;background:${r.won?'rgba(0,212,154,.7)':'rgba(255,69,96,.7)'};border-radius:3px"></div>
+            </div>
+            <span style="font-size:.68rem;font-weight:700;color:${r.won?'var(--green)':'var(--red)'};min-width:50px;text-align:right">${fmt(r.retPct)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Exit breakdown -->
+    <div class="srow" style="margin-bottom:14px">
+      <div class="pill"><strong style="color:var(--green)">${tgtCount}</strong>Target Hit</div>
+      <div class="pill"><strong style="color:var(--red)">${slCount}</strong>Stop Loss Hit</div>
+      <div class="pill"><strong style="color:var(--muted2)">${results.length-tgtCount-slCount}</strong>Time Exit</div>
+    </div>
+
+    <!-- Detail table -->
+    <div class="cwrap" style="padding:0;overflow:hidden">
+      <div style="padding:10px 14px;font-size:.67rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)">
+        Trade-by-Trade Breakdown
+      </div>
+      <div class="tw" style="overflow-x:auto">
+        <table style="min-width:560px">
+          <thead>
+            <tr>
+              <th>Stock</th>
+              <th>Entry ₹</th>
+              <th>Stop ₹</th>
+              <th>Target ₹</th>
+              <th>Exit ₹</th>
+              <th>Return</th>
+              <th>Exit Reason</th>
+              <th>Signal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${results.map(r => `
+              <tr>
+                <td><strong style="color:var(--text)">${r.sym}</strong>
+                  <div style="font-size:.6rem;color:var(--muted2);max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.score}% match</div>
+                </td>
+                <td style="font-size:.74rem">₹${r.entryPrice.toFixed(1)}</td>
+                <td style="font-size:.72rem;color:var(--red)">${r.stop ? '₹'+r.stop : '—'}</td>
+                <td style="font-size:.72rem;color:var(--green)">${r.target ? '₹'+r.target : '—'}</td>
+                <td style="font-size:.74rem">₹${r.exitPrice.toFixed(1)}</td>
+                <td style="font-weight:800;font-size:.8rem;color:${r.won?'var(--green)':'var(--red)'}">
+                  ${fmt(r.retPct)}
+                </td>
+                <td style="font-size:.65rem;color:var(--muted2);max-width:110px">${r.exitReason}</td>
+                <td>
+                  <div style="font-size:.6rem;color:var(--muted2);max-width:140px;line-height:1.3">${r.entryReason}</div>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Methodology note -->
+    <div class="ibox" style="margin-top:12px;font-size:.67rem;line-height:1.6">
+      <strong>Methodology:</strong> Each stock is re-scored using <strong>${strat?.name||stratKey}</strong> strategy criteria
+      at a point <strong>${cfg.lookback} bars ago</strong> using only data available at that time (no look-ahead bias).
+      Stocks scoring ≥50% are simulated with a <strong>${cfg.hold}-bar hold</strong>.
+      Entry = close on signal day. Exit = first of: target hit, stop-loss hit, or ${cfg.hold}-bar time exit.
+      Stop and target from pivot S/R or ATR-based levels. <em>Past performance does not guarantee future results.</em>
+    </div>
+  `;
+}
+
 
 // Position Sizer
 function rPS(){document.getElementById('area').innerHTML=`<div class="sh">🧮 Position Sizer</div><div style="max-width:460px"><div class="f2"><div class="fr"><label>Capital (₹)</label><input type="number" id="pc" value="500000" oninput="cPS()"/></div><div class="fr"><label>Risk %</label><input type="number" id="pr" value="1" step="0.1" oninput="cPS()"/></div></div><div class="f2"><div class="fr"><label>Entry ₹</label><input type="number" id="pe" placeholder="2450" oninput="cPS()"/></div><div class="fr"><label>Stop Loss ₹</label><input type="number" id="psl" placeholder="2390" oninput="cPS()"/></div></div><div class="f2"><div class="fr"><label>Target ₹</label><input type="number" id="pt" placeholder="2560" oninput="cPS()"/></div><div class="fr"><label>Brokerage %</label><input type="number" id="pb3" value="0.05" step="0.01" oninput="cPS()"/></div></div><button class="btn btn-green" onclick="cPS()" style="width:100%;margin-top:4px;font-size:.78rem">Calculate</button><div id="psr"></div></div>`;}

@@ -501,6 +501,14 @@ input,select,textarea{font-size:16px!important;}
 .creator-name{font-size:.7rem;font-weight:700;color:#a78bfa;line-height:1.2;}
 .creator-role{font-size:.58rem;color:var(--muted2);line-height:1.2;}
 @media(max-width:600px){.creator-info{display:none;}.creator-tag{padding:4px;border-radius:50%;}.creator-tag:hover{background:rgba(167,139,250,.18);}}
+/* ── WhatsApp Alert Steps ── */
+.wa-step{display:flex;gap:12px;margin-bottom:16px;align-items:flex-start;}
+.wa-step-num{width:26px;height:26px;border-radius:50%;background:#25d366;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;flex-shrink:0;margin-top:1px;}
+.wa-step-title{font-size:.75rem;font-weight:700;color:var(--text);margin-bottom:3px;}
+.wa-step-desc{font-size:.69rem;color:var(--muted2);line-height:1.5;}
+.btn-green{background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.35);color:#25d366;}
+.btn-green:hover{background:rgba(37,211,102,.25);}
+.btn-green:disabled{opacity:.4;cursor:not-allowed;}
 /* ── FII link cards ── */
 .fii-link-card{display:flex;align-items:center;gap:12px;padding:13px 15px;background:var(--card);border:1px solid var(--border);border-radius:12px;text-decoration:none;color:var(--text);transition:border-color .2s,background .2s;}
 .fii-link-card:hover{border-color:var(--accent);background:var(--card2);}
@@ -543,6 +551,7 @@ input,select,textarea{font-size:16px!important;}
       </label>
       <span id="arcd" style="font-size:.63rem;color:var(--green);min-width:30px">180s</span>
     </div>
+    <button class="btn btn-wa" style="padding:6px 11px;font-size:.7rem;background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.35);color:#25d366" onclick="om('wam')">💬 WhatsApp Alerts</button>
     <button class="btn btn-out" style="padding:6px 10px;font-size:.7rem" onclick="om('alm')">🔔 <span id="alc">0</span></button>
     <button class="btn btn-out" style="padding:6px 10px;font-size:.7rem" onclick="om('wlm')">⭐ <span id="wlc">0</span></button>
     <button class="btn" style="padding:6px 13px;font-size:.74rem" id="lbtn" onclick="loadData()">⚡ Load</button>
@@ -619,6 +628,101 @@ input,select,textarea{font-size:16px!important;}
   <div class="fr"><label>Condition</label><select id="ac"><option value="above">↑ Crosses Above</option><option value="below">↓ Crosses Below</option></select></div>
   <button class="btn btn-green" style="margin-bottom:11px;font-size:.76rem" onclick="addAl()">+ Add Alert</button>
   <div id="all"></div>
+</div></div>
+
+<!-- WhatsApp Alerts Modal -->
+<div class="mbg" id="wam"><div class="modal" style="max-width:440px">
+  <h2>💬 WhatsApp Alerts <button class="mc" onclick="cm('wam')">✕</button></h2>
+
+  <!-- Setup wizard -->
+  <div id="wa-setup" style="display:none">
+    <div style="font-size:.75rem;color:var(--muted2);margin-bottom:14px;line-height:1.6">
+      Get instant WhatsApp messages when any stock hits your alert price. Free, no account needed.
+    </div>
+
+    <!-- Steps -->
+    <div class="wa-step">
+      <div class="wa-step-num">1</div>
+      <div>
+        <div class="wa-step-title">Save this contact on your phone</div>
+        <div class="wa-step-desc">Name: <strong>CallMeBot</strong> &nbsp;·&nbsp; Number: <strong>+34 644 59 78 01</strong></div>
+        <button class="btn btn-out" style="font-size:.68rem;margin-top:6px" onclick="navigator.clipboard.writeText('+34644597801').then(()=>toast('Number copied!','up'))">📋 Copy Number</button>
+      </div>
+    </div>
+
+    <div class="wa-step">
+      <div class="wa-step-num">2</div>
+      <div>
+        <div class="wa-step-title">Send this exact message on WhatsApp</div>
+        <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:.75rem;font-family:monospace;color:var(--green);margin-top:6px;letter-spacing:.3px">
+          I allow callmebot to send me messages
+        </div>
+        <button class="btn btn-out" style="font-size:.68rem;margin-top:6px" onclick="navigator.clipboard.writeText('I allow callmebot to send me messages').then(()=>toast('Message copied!','up'))">📋 Copy Message</button>
+        <div style="font-size:.65rem;color:var(--muted2);margin-top:6px">⏱ You'll receive your API key within 60 seconds</div>
+      </div>
+    </div>
+
+    <div class="wa-step">
+      <div class="wa-step-num">3</div>
+      <div style="flex:1">
+        <div class="wa-step-title">Enter your details below</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          <div>
+            <label style="font-size:.68rem;color:var(--muted2);display:block;margin-bottom:3px">WhatsApp Number (with country code)</label>
+            <input id="wa-phone" class="c" placeholder="+919876543210" style="width:100%;box-sizing:border-box"
+              oninput="waPhoneChanged()"/>
+          </div>
+          <div>
+            <label style="font-size:.68rem;color:var(--muted2);display:block;margin-bottom:3px">API Key (from CallMeBot reply)</label>
+            <input id="wa-key" class="c" placeholder="e.g. 1234567" style="width:100%;box-sizing:border-box"
+              oninput="waPhoneChanged()"/>
+          </div>
+          <button class="btn btn-green" style="font-size:.75rem" onclick="waTest()" id="wa-test-btn" disabled>
+            📤 Test & Activate
+          </button>
+          <div id="wa-test-result" style="font-size:.7rem;min-height:18px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active state — already configured -->
+  <div id="wa-active" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.2);border-radius:10px;margin-bottom:14px">
+      <span style="font-size:1.4rem">✅</span>
+      <div>
+        <div style="font-size:.76rem;font-weight:700;color:#25d366">WhatsApp Alerts Active</div>
+        <div id="wa-active-num" style="font-size:.67rem;color:var(--muted2);margin-top:2px"></div>
+      </div>
+      <button class="btn btn-out" style="font-size:.65rem;margin-left:auto;padding:4px 8px" onclick="waDisconnect()">Disconnect</button>
+    </div>
+
+    <!-- Quick add alert -->
+    <div style="font-size:.7rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Add WhatsApp Alert</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+      <div style="display:flex;gap:8px">
+        <input id="wa-as" class="c" placeholder="Symbol e.g. RELIANCE" style="flex:1;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"/>
+        <select id="wa-ac" class="c" style="flex:0 0 auto">
+          <option value="above">↑ Above</option>
+          <option value="below">↓ Below</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="wa-ap" class="c" type="number" placeholder="Alert Price ₹" style="flex:1"/>
+        <button class="btn btn-green" style="font-size:.75rem;flex:0 0 auto" onclick="waAddAlert()">+ Add</button>
+      </div>
+    </div>
+
+    <!-- Active WA alerts list -->
+    <div style="font-size:.7rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Active WhatsApp Alerts</div>
+    <div id="wa-alert-list"></div>
+
+    <div style="font-size:.63rem;color:var(--muted2);margin-top:12px;line-height:1.5;padding:8px;background:var(--card2);border-radius:8px">
+      🕐 Server checks prices every <strong>5 minutes</strong> during market hours (9:15 AM – 3:35 PM IST, Mon–Fri).<br>
+      You'll get a WhatsApp message the moment a price is hit.
+    </div>
+  </div>
+
 </div></div>
 
 <!-- Watchlist Modal -->
@@ -1692,7 +1796,7 @@ function dSp(s){
 
 // Watchlist
 function togWL(sym){const i=WL.indexOf(sym);if(i>=0)WL.splice(i,1);else WL.push(sym);localStorage.setItem('wl',JSON.stringify(WL));document.getElementById('wlc').textContent=WL.length;const b=document.querySelector(`#card_${sym} button`);if(b)b.textContent=WL.includes(sym)?'⭐':'☆';}
-function om(id){document.getElementById(id).classList.add('open');if(id==='wlm')rWLM();if(id==='alm')rALL();}
+function om(id){if(id==='wam'){waOpenModal();return;}document.getElementById(id).classList.add('open');if(id==='wlm')rWLM();if(id==='alm')rALL();}
 function cm(id){document.getElementById(id).classList.remove('open');}
 function rWLM(){const el=document.getElementById('wlc2');if(!WL.length){el.innerHTML=`<p style="color:var(--muted);font-size:.78rem">No stocks added.</p>`;return;}el.innerHTML=`<div class="tw"><table><thead><tr><th>Symbol</th><th>Price</th><th>Day%</th><th>RSI</th><th></th></tr></thead><tbody>${WL.map(sym=>{const s=AS.find(x=>x.symbol===sym);if(!s)return`<tr><td colspan="5">${sym}</td></tr>`;const cc=s.pctChange>=0?'up':'dn';return`<tr><td><strong>${sym}</strong></td><td>₹${s.price.toFixed(1)}</td><td class="${cc}">${(s.pctChange>=0?'+':'')+s.pctChange.toFixed(2)}%</td><td>${s.rsi?s.rsi.toFixed(1):'–'}</td><td><button onclick="togWL('${sym}');rWLM()" style="background:none;border:none;color:var(--red);cursor:pointer">✕</button></td></tr>`;}).join('')}</tbody></table></div>`;}
 function exWL(){const rows=['Symbol,Price,Day%,RSI,Sector'];WL.forEach(sym=>{const s=AS.find(x=>x.symbol===sym);if(s)rows.push(`${s.symbol},${s.price.toFixed(2)},${s.pctChange.toFixed(2)},${s.rsi?s.rsi.toFixed(1):''},${s.sector}`);});const a=document.createElement('a');a.href='data:text/csv,'+encodeURIComponent(rows.join('\n'));a.download='watchlist.csv';a.click();}
@@ -1704,6 +1808,218 @@ function addAl(){const sym=document.getElementById('as').value.trim().toUpperCas
 function qAl(sym,price){document.getElementById('as').value=sym;document.getElementById('ap').value=price.toFixed(1);om('alm');}
 function rAl(id){ALT=ALT.filter(a=>a.id!==id);localStorage.setItem('alt',JSON.stringify(ALT));rALL();}
 function rALL(){const el=document.getElementById('all');if(!ALT.length){el.innerHTML=`<p style="color:var(--muted);font-size:.76rem">No alerts set.</p>`;return;}el.innerHTML=`<div class="tw"><table><thead><tr><th>Symbol</th><th>Price</th><th>Cond</th><th>Status</th><th></th></tr></thead><tbody>${ALT.map(a=>`<tr><td><strong>${a.sym}</strong></td><td>₹${a.price}</td><td>${a.cond==='above'?'↑':'↓'}</td><td style="color:${a.triggered?'var(--muted)':'var(--yellow)'}">${a.triggered?'✅':'⏳'}</td><td><button onclick="rAl(${a.id})" style="background:none;border:none;color:var(--red);cursor:pointer">✕</button></td></tr>`).join('')}</tbody></table></div>`;}
+// ── WHATSAPP ALERT SYSTEM ─────────────────────────────────────────────────────
+
+// Load saved WA config from localStorage
+let WA_CFG = JSON.parse(localStorage.getItem('wa_cfg') || 'null');
+// WA_ALERTS: [{sym, cond, price, id, triggered, triggeredAt}]
+let WA_ALERTS = JSON.parse(localStorage.getItem('wa_alerts') || '[]');
+
+function waSave() {
+  localStorage.setItem('wa_cfg',    JSON.stringify(WA_CFG));
+  localStorage.setItem('wa_alerts', JSON.stringify(WA_ALERTS));
+}
+
+// wam is handled by waOpenModal — the onclick already calls om('wam')
+// We patch the existing om() to also handle 'wam'
+
+function waOpenModal() {
+  document.getElementById('wam').classList.add('open');
+  if (WA_CFG?.phone && WA_CFG?.key) {
+    waShowActive();
+  } else {
+    waShowSetup();
+  }
+}
+
+function waShowSetup() {
+  document.getElementById('wa-setup').style.display = 'block';
+  document.getElementById('wa-active').style.display = 'none';
+  if (WA_CFG?.phone) document.getElementById('wa-phone').value = WA_CFG.phone;
+  if (WA_CFG?.key)   document.getElementById('wa-key').value   = WA_CFG.key;
+}
+
+function waShowActive() {
+  document.getElementById('wa-setup').style.display = 'none';
+  document.getElementById('wa-active').style.display = 'block';
+  document.getElementById('wa-active-num').textContent =
+    'Sending alerts to ' + WA_CFG.phone;
+  waRenderAlerts();
+}
+
+function waPhoneChanged() {
+  const phone = document.getElementById('wa-phone').value.trim();
+  const key   = document.getElementById('wa-key').value.trim();
+  const btn   = document.getElementById('wa-test-btn');
+  btn.disabled = !(phone.length >= 8 && key.length >= 4);
+}
+
+async function waTest() {
+  const phone = document.getElementById('wa-phone').value.trim();
+  const key   = document.getElementById('wa-key').value.trim();
+  const res   = document.getElementById('wa-test-result');
+
+  if (!phone || !key) return;
+
+  const btn = document.getElementById('wa-test-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Sending...';
+  res.textContent = '';
+
+  try {
+    const r = await fetch(
+      `${PROXY_BASE}/api/wa/test`,
+      { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, key }),
+        signal: AbortSignal.timeout(15000) }
+    );
+    const d = await r.json();
+
+    if (d.ok) {
+      WA_CFG = { phone, key };
+      waSave();
+      res.innerHTML = '<span style="color:var(--green)">✅ Test message sent! Check WhatsApp.</span>';
+      setTimeout(() => {
+        res.innerHTML = '<span style="color:var(--green)">✅ WhatsApp alerts activated!</span>';
+        setTimeout(() => waShowActive(), 1200);
+      }, 1500);
+    } else {
+      res.innerHTML = `<span style="color:var(--red)">❌ Failed: ${d.error || 'Check number & API key'}</span>`;
+      btn.disabled = false;
+      btn.textContent = '📤 Test & Activate';
+    }
+  } catch(e) {
+    res.innerHTML = '<span style="color:var(--red)">❌ Network error — is the server running?</span>';
+    btn.disabled = false;
+    btn.textContent = '📤 Test & Activate';
+  }
+}
+
+function waDisconnect() {
+  if (!confirm('Disconnect WhatsApp alerts? Your alert list will be kept.')) return;
+  WA_CFG = null;
+  waSave();
+  waShowSetup();
+}
+
+function waAddAlert() {
+  const sym  = document.getElementById('wa-as').value.trim().toUpperCase();
+  const cond = document.getElementById('wa-ac').value;
+  const price= parseFloat(document.getElementById('wa-ap').value);
+  if (!sym || !price) { toast('Enter symbol and price', 'dn'); return; }
+
+  // Check for duplicate
+  if (WA_ALERTS.some(a => a.sym===sym && a.cond===cond && a.price===price && !a.triggered)) {
+    toast('Alert already exists', 'dn'); return;
+  }
+
+  WA_ALERTS.push({ sym, cond, price, id: Date.now(), triggered: false, triggeredAt: null });
+  waSave();
+  syncWAAlerts();
+  document.getElementById('wa-as').value = '';
+  document.getElementById('wa-ap').value = '';
+  waRenderAlerts();
+  toast(`Alert set: ${sym} ${cond} ₹${price}`, 'up');
+}
+
+function waRemoveAlert(id) {
+  WA_ALERTS = WA_ALERTS.filter(a => a.id !== id);
+  waSave();
+  syncWAAlerts();
+  waRenderAlerts();
+}
+
+function waRenderAlerts() {
+  const el = document.getElementById('wa-alert-list');
+  if (!el) return;
+  const active    = WA_ALERTS.filter(a => !a.triggered);
+  const triggered = WA_ALERTS.filter(a =>  a.triggered);
+
+  if (!WA_ALERTS.length) {
+    el.innerHTML = '<div style="font-size:.72rem;color:var(--muted2);padding:8px 0">No alerts set yet.</div>';
+    return;
+  }
+
+  const rowHTML = (a) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1">
+        <span style="font-size:.78rem;font-weight:700;color:var(--text)">${a.sym}</span>
+        <span style="font-size:.7rem;color:${a.cond==='above'?'var(--green)':'var(--red)'}">
+          ${a.cond==='above'?'↑ above':'↓ below'} ₹${a.price}
+        </span>
+        ${a.triggered ? `<span style="font-size:.64rem;color:var(--muted2);margin-left:4px">· Triggered ${a.triggeredAt||''}</span>` : ''}
+      </div>
+      <span style="font-size:.8rem">${a.triggered ? '✅' : '⏳'}</span>
+      <button onclick="waRemoveAlert(${a.id})"
+        style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem;padding:0 4px">✕</button>
+    </div>`;
+
+  el.innerHTML =
+    (active.length    ? active.map(rowHTML).join('')    : '') +
+    (triggered.length ? `<div style="font-size:.64rem;color:var(--muted2);margin-top:8px;margin-bottom:4px">TRIGGERED</div>` + triggered.map(rowHTML).join('') : '');
+}
+
+// Sync active alerts to server so it can check prices independently
+async function syncWAAlerts() {
+  if (!WA_CFG?.phone || !WA_CFG?.key) return;
+  const active = WA_ALERTS.filter(a => !a.triggered);
+  try {
+    await fetch(`${PROXY_BASE}/api/wa/alerts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: WA_CFG.phone, key: WA_CFG.key, alerts: active }),
+      signal: AbortSignal.timeout(8000)
+    });
+  } catch(e) { /* silent — server might be sleeping */ }
+}
+
+// Poll server for triggered alerts and update local state
+async function pollWATriggered() {
+  if (!WA_CFG?.phone) return;
+  try {
+    const r = await fetch(
+      `${PROXY_BASE}/api/wa/triggered?phone=${encodeURIComponent(WA_CFG.phone)}`,
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (!r.ok) return;
+    const { triggered } = await r.json();
+    if (!triggered?.length) return;
+
+    let changed = false;
+    for (const t of triggered) {
+      const a = WA_ALERTS.find(x => x.id === t.id && !x.triggered);
+      if (a) {
+        a.triggered   = true;
+        a.triggeredAt = t.at || '';
+        changed = true;
+        toast(`📲 WhatsApp sent: ${a.sym} ${a.cond} ₹${a.price}`, 'up');
+      }
+    }
+    if (changed) {
+      waSave();
+      if (document.getElementById('wam').classList.contains('open')) waRenderAlerts();
+    }
+  } catch(e) {}
+}
+
+// Sync on startup and every 5 minutes
+function waInit() {
+  if (WA_CFG?.phone) syncWAAlerts();
+  setInterval(() => {
+    if (WA_CFG?.phone) {
+      syncWAAlerts();
+      pollWATriggered();
+    }
+  }, 5 * 60 * 1000);
+  // Also poll every 90s for triggered updates
+  setInterval(() => { if (WA_CFG?.phone) pollWATriggered(); }, 90000);
+}
+
+// Call on page load
+setTimeout(waInit, 2000);
+
+
 async function chkAlerts(){const act=ALT.filter(a=>!a.triggered);if(!act.length)return;for(const a of act){try{const r=await fetch(`${PROXY_BASE}/api/chart?symbol=${encodeURIComponent(a.sym)}`,{signal:AbortSignal.timeout(12000)});if(!r.ok)continue;const d=await r.json();const price=d?.chart?.result?.[0]?.meta?.regularMarketPrice;if(!price)continue;const triggered=(a.cond==='above'&&price>=a.price)||(a.cond==='below'&&price<=a.price);if(triggered){a.triggered=true;const type=a.cond==='above'?'up':'dn';playSound(type);toast(`${a.sym} ₹${price.toFixed(1)} — ${a.cond==='above'?'crossed above':'crossed below'} ₹${a.price}`,type);localStorage.setItem('alt',JSON.stringify(ALT));document.getElementById('alc').textContent=ALT.filter(x=>!x.triggered).length;}}catch(e){}}}
 
 function toast(msg,type){const ta=document.getElementById('ta');const el=document.createElement('div');el.className=`ti ${type==='up'?'tiu':type==='dn'?'tid':''}`;el.innerHTML=`${type==='up'?'📈':type==='dn'?'📉':'ℹ️'} ${msg}`;ta.appendChild(el);setTimeout(()=>el.remove(),4500);}

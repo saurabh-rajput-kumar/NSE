@@ -2430,13 +2430,14 @@ function btRender(searchQ) {
 
 // ── Compute backtest results ──────────────────────────────────────────────────
 function btCompute(tf, stratKey) {
-  // Timeframe config — constrained to 1-year daily data (~252 bars)
+  // Scan window: how far back to look for signals
+  // Hold: how many bars to simulate after entry
   const TF_CFG = {
-    '5d':  { label:'5-Day Momentum',  lookback: 18,  hold: 5,  period:'last 4 weeks',   minBars: 30,  useWeekly: false },
-    '2w':  { label:'2–4 Week Swing',  lookback: 75,  hold: 14, period:'last 15 weeks',  minBars: 100, useWeekly: false },
-    'pos': { label:'Positional',      lookback: 120, hold: 60, period:'6 months back',  minBars: 185, useWeekly: true  },
+    '5d':  { label:'5-Day Momentum', scanBars: 40,  hold: 5,  minBars: 30,  period:'last 2 months',  useWeekly: false },
+    '2w':  { label:'2–4 Week Swing', scanBars: 120, hold: 14, minBars: 100, period:'last 6 months',  useWeekly: false },
+    'pos': { label:'Positional',     scanBars: 220, hold: 60, minBars: 185, period:'last 10 months', useWeekly: true  },
   };
-  const cfg = TF_CFG[tf] || TF_CFG['5d'];
+  const cfg   = TF_CFG[tf] || TF_CFG['5d'];
   const strat = getStrats(tf)[stratKey];
   const results = [];
 
@@ -2446,158 +2447,159 @@ function btCompute(tf, stratKey) {
     if (!dc || dc.length < cfg.minBars) return;
 
     const n = dc.length;
-    const entryIdx = n - cfg.lookback;
-    const exitIdx  = Math.min(entryIdx + cfg.hold, n - 1);
-    if (entryIdx < 20) return;
 
-    // Slice data up to entry point (no look-ahead)
-    const c_ = dc.slice(0, entryIdx + 1);
-    const h_ = dh.slice(0, entryIdx + 1);
-    const l_ = dl.slice(0, entryIdx + 1);
-    const v_ = dv.slice(0, entryIdx + 1);
-    if (c_.length < 22) return;
+    // ── Scan history for the FIRST bar where strategy triggered ───────────────
+    // Scan from (n - scanBars) forward, leaving room for hold period + 20 bars history
+    const scanStart = Math.max(20, n - cfg.scanBars);
+    let entryIdx = -1;
 
-    const entryPrice = c_[c_.length - 1];
-    if (!entryPrice) return;
+    for (let bar = scanStart; bar < n - cfg.hold; bar++) {
+      // Slice data UP TO this bar (strict no look-ahead)
+      const c_ = dc.slice(0, bar + 1);
+      const h_ = dh.slice(0, bar + 1);
+      const l_ = dl.slice(0, bar + 1);
+      const v_ = dv.slice(0, bar + 1);
+      if (c_.length < 22) continue;
 
-    // Build weekly candles from slice
-    const wkly = [];
-    for (let i = 0; i + 4 < c_.length; i += 5) {
-      const wc=c_.slice(i,i+5),wh=h_.slice(i,i+5),wl=l_.slice(i,i+5),wv=v_.slice(i,i+5);
-      wkly.push({ o:c_[i], h:Math.max(...wh), l:Math.min(...wl), c:wc[wc.length-1], v:wv.reduce((a,b)=>a+b,0) });
-    }
+      const ep = c_[c_.length - 1];
+      if (!ep || ep <= 0) continue;
 
-    // Rebuild snapshot stock object at entry point
-    const snap = {
-      ...s,
-      price:    entryPrice,
-      e20:      ec(c_.slice(-25), 20),
-      e50:      c_.length >= 55 ? ec(c_.slice(-55), 50) : entryPrice,
-      rsi:      rc(c_.slice(-20), 14),
-      rsiW:     wkly.length >= 10 ? rc(wkly.map(w=>w.c).slice(-14), 14) : null,
-      bb:       bbc(c_.slice(-20), 20),
-      volRatio: (() => {
-        const avgV = v_.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
-        return (v_[v_.length-1] || avgV) / avgV;
-      })(),
-      pct52: (() => {
-        const w = c_.slice(-252), hi = Math.max(...w), lo = Math.min(...w);
-        return hi!==lo ? ((entryPrice-lo)/(hi-lo))*100 : 50;
-      })(),
-      h52:     Math.max(...c_.slice(-252)),
-      l52:     Math.min(...c_.slice(-252)),
-      redDays: (() => { let r=0; for(let i=c_.length-1;i>0;i--){if(c_[i]<c_[i-1])r++;else break;} return r; })(),
-      weekChg: c_.length>=6 ? ((entryPrice - c_[c_.length-6])/c_[c_.length-6])*100 : 0,
-      sr:      src(c_, h_, l_, entryPrice),
-      daily:   { c:c_, h:h_, l:l_, v:v_ },
-      weekly:  wkly,
-      spark:   c_.slice(-20),
-      avgVol:  v_.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1,
-      lastVol: v_[v_.length-1] || 0,
-    };
+      // Build weekly candles for this snapshot
+      const wkly = [];
+      for (let i = 0; i + 4 < c_.length; i += 5) {
+        const wc=c_.slice(i,i+5), wh=h_.slice(i,i+5), wl=l_.slice(i,i+5), wv=v_.slice(i,i+5);
+        wkly.push({ o:c_[i], h:Math.max(...wh), l:Math.min(...wl), c:wc[wc.length-1], v:wv.reduce((a,b)=>a+b,0) });
+      }
 
-    // Score at entry point (temporarily override globals)
-    const savedTF=ACTIVE_TF, savedSS=ACTIVE_SUBSTRAT;
-    ACTIVE_TF=tf; ACTIVE_SUBSTRAT=stratKey;
-    const scored = scoreStock(snap);
-    ACTIVE_TF=savedTF; ACTIVE_SUBSTRAT=savedSS;
+      const snap = {
+        ...s,
+        price:    ep,
+        e20:      ec(c_.slice(-25), 20),
+        e50:      c_.length >= 55 ? ec(c_.slice(-55), 50) : ep,
+        rsi:      rc(c_.slice(-20), 14),
+        rsiW:     wkly.length >= 10 ? rc(wkly.map(w=>w.c).slice(-14), 14) : null,
+        bb:       bbc(c_.slice(-20), 20),
+        volRatio: (() => {
+          const avgV = v_.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
+          return (v_[v_.length-1] || avgV) / avgV;
+        })(),
+        pct52: (() => {
+          const w = c_.slice(-252), hi = Math.max(...w), lo = Math.min(...w);
+          return hi!==lo ? ((ep-lo)/(hi-lo))*100 : 50;
+        })(),
+        h52:     Math.max(...c_.slice(-252)),
+        l52:     Math.min(...c_.slice(-252)),
+        redDays: (() => { let r=0; for(let i=c_.length-1;i>0;i--){if(c_[i]<c_[i-1])r++;else break;} return r; })(),
+        weekChg: c_.length>=6 ? ((ep - c_[c_.length-6])/c_[c_.length-6])*100 : 0,
+        sr:      src(c_, h_, l_, ep),
+        daily:   { c:c_, h:h_, l:l_, v:v_ },
+        weekly:  wkly,
+        spark:   c_.slice(-20),
+        avgVol:  v_.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1,
+        lastVol: v_[v_.length-1] || 0,
+      };
 
-    if (scored.score < 50) return;
+      // Score — temporarily override globals
+      const savedTF=ACTIVE_TF, savedSS=ACTIVE_SUBSTRAT;
+      ACTIVE_TF=tf; ACTIVE_SUBSTRAT=stratKey;
+      const scored = scoreStock(snap);
+      ACTIVE_TF=savedTF; ACTIVE_SUBSTRAT=savedSS;
 
-    const rr = scored.rrData;
-    const atr = calcATR(dh.slice(0, entryIdx+1), dl.slice(0, entryIdx+1), dc.slice(0, entryIdx+1), 14) || 0;
+      if (scored.score >= 50) {
+        // Found the entry bar for this stock
+        entryIdx = bar;
 
-    // ── Simulate trade bar by bar ─────────────────────────────────────────────
-    let slHit=false, slHitDay=null, tgtHit=false, tgtHitDay=null;
-    let trailingStop = rr?.stop || null;
-    let peakPrice = entryPrice;
+        const exitIdx   = Math.min(bar + cfg.hold, n - 1);
+        const entryPrice = ep;
+        const rr         = scored.rrData;
+        const atr        = calcATR(dh.slice(0, bar+1), dl.slice(0, bar+1), dc.slice(0, bar+1), 14) || 0;
 
-    for (let i = entryIdx+1; i <= exitIdx; i++) {
-      const bar_h = dh[i], bar_l = dl[i], bar_c = dc[i];
+        // ── Simulate trade bar by bar ──────────────────────────────────────────
+        let slHit=false, slHitDay=null, tgtHit=false, tgtHitDay=null;
+        let trailingStop = rr?.stop || null;
+        let peakPrice    = entryPrice;
 
-      // Update trailing stop: moves up when price makes new high
-      // Trailing rule: stop = peak - 2×ATR (for daily), or below swing low
-      if (atr > 0 && bar_h > peakPrice) {
-        peakPrice = bar_h;
-        const newTSL = peakPrice - 2 * atr;
-        if (trailingStop === null || newTSL > trailingStop) {
-          trailingStop = newTSL;
+        for (let i = bar+1; i <= exitIdx; i++) {
+          const bar_h=dh[i], bar_l=dl[i];
+
+          // Update trailing stop when new high made
+          if (atr > 0 && bar_h > peakPrice) {
+            peakPrice = bar_h;
+            const newTSL = peakPrice - 2 * atr;
+            if (trailingStop === null || newTSL > trailingStop) trailingStop = newTSL;
+          }
+
+          // Target hit check
+          if (!tgtHit && rr?.target && bar_h >= rr.target) {
+            tgtHit=true; tgtHitDay=i-bar;
+          }
+          // Stop hit check
+          const activeSL = trailingStop;
+          if (!slHit && activeSL && bar_l <= activeSL) {
+            slHit=true; slHitDay=i-bar;
+          }
+          // Same-bar conflict: stop wins (conservative)
+          if (slHit && tgtHit && slHitDay===tgtHitDay) tgtHit=false;
         }
-      }
 
-      // Target hit
-      if (!tgtHit && rr?.target && bar_h >= rr.target) {
-        tgtHit=true; tgtHitDay=i-entryIdx;
+        // Effective exit
+        let effectiveExit = dc[exitIdx] || entryPrice;
+        let exitReason = `Time exit (${cfg.hold}d)`;
+        const trailingActive = trailingStop && rr?.stop && trailingStop > (rr.stop + atr*0.1);
+
+        if (slHit && (!tgtHit || slHitDay <= tgtHitDay)) {
+          effectiveExit = trailingStop || rr?.stop || entryPrice;
+          exitReason    = trailingActive
+            ? `Trailing SL hit (day ${slHitDay})`
+            : `Fixed SL hit (day ${slHitDay})`;
+        } else if (tgtHit) {
+          effectiveExit = rr.target;
+          exitReason    = `Target hit ✅ (day ${tgtHitDay})`;
+        }
+
+        const effectiveRet = ((effectiveExit - entryPrice) / entryPrice) * 100;
+        const stopDist     = rr?.stop ? entryPrice - rr.stop : null;
+        const rrAchieved   = stopDist && stopDist > 0
+          ? +((effectiveExit - entryPrice) / stopDist).toFixed(2) : null;
+
+        const whyEnter = scored.checks.filter(ch=>ch.pass).slice(0,3).map(ch=>ch.label).join(' · ');
+        let whyExit = '';
+        if (tgtHit)     whyExit = `Reached target ₹${rr?.target?.toFixed(1)} — S/R resistance hit`;
+        else if (slHit) whyExit = trailingActive
+          ? `Trailing stop triggered (2×ATR below peak ₹${peakPrice.toFixed(1)})`
+          : `Support breached at ₹${(rr?.stop||0).toFixed(1)} — initial SL level`;
+        else            whyExit = `Hold period elapsed (${cfg.hold} trading days)`;
+
+        results.push({
+          sym:          s.symbol,
+          name:         s.name,
+          score:        scored.score,
+          entryPrice,
+          exitPrice:    effectiveExit,
+          retPct:       +effectiveRet.toFixed(2),
+          won:          effectiveRet > 0,
+          slHit, tgtHit, slHitDay, tgtHitDay,
+          exitReason, whyEnter, whyExit,
+          stop:        rr?.stop    ? +rr.stop.toFixed(2)    : null,
+          target:      rr?.target  ? +rr.target.toFixed(2)  : null,
+          trailStop:   trailingStop ? +trailingStop.toFixed(2) : null,
+          rrPlanned:   rr?.rr      ? +rr.rr.toFixed(1)      : null,
+          rrAchieved,
+          entryDate:   btFmtDate(ts[bar]),
+          exitDate:    btFmtDate(ts[exitIdx]),
+          entryIdx:    bar,
+          exitIdx,
+        });
+        break; // only first trigger per stock
       }
-      // Stop hit (trailing or fixed — whichever is higher)
-      const activeSL = trailingStop;
-      if (!slHit && activeSL && bar_l <= activeSL) {
-        slHit=true; slHitDay=i-entryIdx;
-      }
-      // Once both hit in same bar, stop wins (conservative)
-      if (slHit && tgtHit && slHitDay === tgtHitDay) { tgtHit=false; }
     }
-
-    // Effective exit price
-    let effectiveExit = dc[exitIdx] || entryPrice;
-    let exitReason = `Time exit (${cfg.hold}d)`;
-    const trailingActive = trailingStop && rr?.stop && trailingStop > rr.stop + atr*0.1;
-
-    if (slHit && (!tgtHit || slHitDay <= tgtHitDay)) {
-      effectiveExit = trailingStop || rr?.stop || entryPrice;
-      exitReason = trailingActive
-        ? `Trailing SL hit (day ${slHitDay})`
-        : `Fixed SL hit (day ${slHitDay})`;
-    } else if (tgtHit) {
-      effectiveExit = rr.target;
-      exitReason = `Target hit ✅ (day ${tgtHitDay})`;
-    }
-
-    const effectiveRet = ((effectiveExit - entryPrice) / entryPrice) * 100;
-    const stopDist     = rr?.stop ? entryPrice - rr.stop : null;
-    const rrAchieved   = stopDist && stopDist > 0
-      ? +((effectiveExit - entryPrice) / stopDist).toFixed(2)
-      : null;
-
-    // Entry reasons: top 3 passing checks
-    const whyEnter = scored.checks.filter(ch=>ch.pass).slice(0,3).map(ch=>ch.label).join(' · ');
-
-    // Exit reasons (why you should have exited at target)
-    let whyExit = '';
-    if (tgtHit)     whyExit = `Reached S/R resistance ₹${rr?.target?.toFixed(1)} — original target hit`;
-    else if (slHit) whyExit = trailingActive
-      ? `Price fell below trailing stop (${2}× ATR below peak ₹${peakPrice.toFixed(1)})`
-      : `Price breached support at ₹${(rr?.stop||0).toFixed(1)} — initial risk level`;
-    else            whyExit = `Hold period elapsed (${cfg.hold} trading days)`;
-
-    // Dates
-    const entryDate = btFmtDate(ts[entryIdx]);
-    const exitDate  = btFmtDate(ts[exitIdx]);
-
-    results.push({
-      sym:          s.symbol,
-      name:         s.name,
-      score:        scored.score,
-      entryPrice:   entryPrice,
-      exitPrice:    effectiveExit,
-      rawExitPrice: dc[exitIdx],
-      retPct:       +effectiveRet.toFixed(2),
-      won:          effectiveRet > 0,
-      slHit, tgtHit, slHitDay, tgtHitDay,
-      exitReason, whyEnter, whyExit,
-      stop:         rr?.stop      ? +rr.stop.toFixed(2)   : null,
-      target:       rr?.target    ? +rr.target.toFixed(2) : null,
-      trailStop:    trailingStop  ? +trailingStop.toFixed(2) : null,
-      rrPlanned:    rr?.rr        ? +rr.rr.toFixed(1)     : null,
-      rrAchieved,
-      entryDate, exitDate,
-      entryIdx, exitIdx,
-    });
+    // If no signal found, skip this stock silently
   });
 
   results.sort((a,b) => b.retPct - a.retPct);
   return results;
 }
+
 
 // ── Display (can be called with search filter) ────────────────────────────────
 function btDisplayResults(searchQ) {

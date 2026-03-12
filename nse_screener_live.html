@@ -870,6 +870,10 @@ async function fetchS(sym) {
       });
     }
 
+    // Filter timestamps to match valid OHLCV indices
+    const rawTs = res.timestamp || [];
+    const ts_ = rawTs.filter((_, i) => cs[i] != null && cs[i] > 0);
+
     return {
       symbol: sym, name, price, pctChange: pct, weekChg: wkChg, mcap,
       e20, e50, rsi: r14, rsiW: r14w, volRatio: vr,
@@ -879,7 +883,8 @@ async function fetchS(sym) {
       peOI: Math.round(lv * 0.45 / 1000),
       avgVol: avgV, lastVol: lv,
       daily: { c: c_, h: h_, l: l_, v: v_ },  // full daily OHLCV
-      weekly: wkly                              // aggregated weekly candles
+      weekly: wkly,                             // aggregated weekly candles
+      timestamps: ts_                           // Unix timestamps per daily bar
     };
   } catch(e) { return null; }
 }
@@ -1483,6 +1488,7 @@ function calcRR(s) {
 }
 
 let ACTIVE_TF='5d', ACTIVE_SUBSTRAT='rubber';
+let BT_TF=null, BT_STRAT=null, BT_RESULTS=[];  // backtest local state
 
 function getStrats(tf){
   if(tf==='2w') return STRATS_2W;
@@ -2327,7 +2333,6 @@ function rCal(){const ev=[{d:5,m:'Mar',e:'RBI MPC Day 1',desc:`Policy meeting be
 
 // News
 function rNews(){if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty">Load data first.</div>`;return;}const ws=WL.length?WL:AS.slice(0,8).map(s=>s.symbol);const T=[(s,p)=>`${s} Q3 PAT up 18% YoY — brokerages raise target to ₹${(p*1.15).toFixed(0)}`,(s,p)=>`${s} secures ₹2,400Cr order from NTPC`,(s,p)=>`FII net buying ₹320Cr in ${s} — 5 sessions`,(s,p)=>`${s} buyback at ₹${(p*1.08).toFixed(0)} — 10% premium`,(s,p)=>`Block deal: ${s} 2.1% stake at ₹${(p*0.98).toFixed(0)}`,(s,p)=>`${s} FY26 guidance maintained`,(s,p)=>`Promoter raises ${s} stake by 1.5%`,(s,p)=>`${s} board approves 1:2 bonus shares`];const dates=['3 Mar','2 Mar','1 Mar','28 Feb','27 Feb'];const items=[];ws.slice(0,10).forEach((sym,i)=>{const s=AS.find(x=>x.symbol===sym);if(!s)return;items.push({sym,title:T[i%T.length](sym,s.price),date:dates[i%dates.length]});});document.getElementById('area').innerHTML=`<div class="sh">📰 News Feed</div><div class="ibox">Live news: <a href="https://www.moneycontrol.com/news/business/stocks/" target="_blank" style="color:var(--accent)">Moneycontrol</a> | <a href="https://economictimes.indiatimes.com/markets/stocks/news" target="_blank" style="color:var(--accent)">Economic Times</a> | <a href="https://www.nseindia.com/companies-listing/corporate-filings-announcements" target="_blank" style="color:var(--accent)">NSE Announcements</a></div>${items.map(n=>`<div class="ni"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:.69rem;font-weight:700;color:var(--accent)">📌 ${n.sym}</span><span style="font-size:.63rem;color:var(--muted)">${n.date}</span></div><div style="font-size:.76rem">${n.title}</div></div>`).join('')}`;}
-
 // Backtest
 function rBT() {
   const area = document.getElementById('area');
@@ -2335,269 +2340,427 @@ function rBT() {
     area.innerHTML = `<div class="empty">⚡ Load data first, then run backtest.</div>`;
     return;
   }
+  // Init BT state from active screener on first call
+  if (!BT_TF) {
+    BT_TF = (ACTIVE_TF === 'inv' ? '2w' : ACTIVE_TF) || '5d';
+    const strats = getStrats(BT_TF);
+    BT_STRAT = (ACTIVE_SUBSTRAT in strats) ? ACTIVE_SUBSTRAT : Object.keys(strats)[0];
+  }
+  btRender('');
+}
 
-  // ── Timeframe config ──────────────────────────────────────────────────────
-  const TF_CFG = {
-    '5d':  { label:'5-Day Momentum',  lookback: 20,  hold: 5,   period:'4 weeks',   minBars:25  },
-    '2w':  { label:'2–4 Week Swing',  lookback: 80,  hold: 14,  period:'16 weeks',  minBars:100 },
-    'pos': { label:'Positional',      lookback: 504, hold: 63,  period:'3 years',   minBars:520 },
-    'inv': { label:'Investment',      lookback: 252, hold: 63,  period:'1 year',    minBars:270 },
-  };
-
-  const tf  = ACTIVE_TF === 'inv' ? '2w' : ACTIVE_TF;   // inv falls back to 2w for bt
-  const cfg = TF_CFG[tf] || TF_CFG['2w'];
+function btChangeTF(tf) {
+  BT_TF = tf;
   const strats = getStrats(tf);
-  const stratKey = ACTIVE_SUBSTRAT in strats ? ACTIVE_SUBSTRAT : Object.keys(strats)[0];
-  const strat = strats[stratKey];
+  BT_STRAT = Object.keys(strats)[0];
+  btRender(document.getElementById('bt-search')?.value || '');
+}
 
-  // ── Score each stock at a historical point & simulate entry/exit ──────────
+function btChangeStrat(strat) {
+  BT_STRAT = strat;
+  btRender(document.getElementById('bt-search')?.value || '');
+}
+
+function btSearch() {
+  const q = (document.getElementById('bt-search')?.value || '').trim().toUpperCase();
+  // Filter already-computed BT_RESULTS
+  btDisplayResults(q);
+}
+
+// ── date helper ───────────────────────────────────────────────────────────────
+function btFmtDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts * 1000);
+  return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' });
+}
+
+// ── ATR helper ────────────────────────────────────────────────────────────────
+function calcATR(h, l, c, period) {
+  if (!h || h.length < period + 1) return null;
+  const trs = [];
+  for (let i = 1; i < h.length; i++) {
+    trs.push(Math.max(h[i]-l[i], Math.abs(h[i]-c[i-1]), Math.abs(l[i]-c[i-1])));
+  }
+  return trs.slice(-period).reduce((a,b)=>a+b,0) / period;
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+function btRender(searchQ) {
+  const area = document.getElementById('area');
+  const tf       = BT_TF   || '5d';
+  const stratKey = BT_STRAT || 'rubber';
+  const allStrats5D = { '5d': STRATS_5D, '2w': STRATS_2W, 'pos': STRATS_POS };
+
+  // Strategy dropdown options for current TF
+  const stratOptions = Object.entries(getStrats(tf))
+    .map(([k,v]) => `<option value="${k}" ${k===stratKey?'selected':''}>${v.emoji||''} ${v.name}</option>`)
+    .join('');
+
+  // TF options
+  const tfOptions = [
+    ['5d','⚡ 5-Day'],['2w','📅 2–4 Week'],['pos','🏦 Positional']
+  ].map(([v,l]) => `<option value="${v}" ${v===tf?'selected':''}>${l}</option>`).join('');
+
+  // Control bar (always visible)
+  const ctrlBar = `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px">
+      <div style="display:flex;flex-direction:column;gap:3px;flex:0 0 auto">
+        <label style="font-size:.6rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Timeframe</label>
+        <select class="c" onchange="btChangeTF(this.value)" style="font-size:.74rem;padding:5px 8px;min-width:130px">${tfOptions}</select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:160px">
+        <label style="font-size:.6rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Strategy</label>
+        <select class="c" onchange="btChangeStrat(this.value)" style="font-size:.74rem;padding:5px 8px">${stratOptions}</select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:140px">
+        <label style="font-size:.6rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Filter Results</label>
+        <input id="bt-search" class="c" placeholder="Search symbol / name…" oninput="btSearch()"
+          style="font-size:.74rem;padding:5px 8px"/>
+      </div>
+    </div>`;
+
+  area.innerHTML = ctrlBar + `<div id="bt-results"><div class="loader" style="margin:30px auto"><div class="spin"></div><div class="lt">Running backtest…</div></div></div>`;
+
+  // Run in next tick so spinner renders first
+  setTimeout(() => {
+    BT_RESULTS = btCompute(tf, stratKey);
+    btDisplayResults('');
+  }, 30);
+}
+
+// ── Compute backtest results ──────────────────────────────────────────────────
+function btCompute(tf, stratKey) {
+  // Timeframe config — constrained to 1-year daily data (~252 bars)
+  const TF_CFG = {
+    '5d':  { label:'5-Day Momentum',  lookback: 18,  hold: 5,  period:'last 4 weeks',   minBars: 30,  useWeekly: false },
+    '2w':  { label:'2–4 Week Swing',  lookback: 75,  hold: 14, period:'last 15 weeks',  minBars: 100, useWeekly: false },
+    'pos': { label:'Positional',      lookback: 120, hold: 60, period:'6 months back',  minBars: 185, useWeekly: true  },
+  };
+  const cfg = TF_CFG[tf] || TF_CFG['5d'];
+  const strat = getStrats(tf)[stratKey];
   const results = [];
 
   AS.forEach(s => {
     const dc = s.daily?.c, dh = s.daily?.h, dl = s.daily?.l, dv = s.daily?.v;
+    const ts = s.timestamps || [];
     if (!dc || dc.length < cfg.minBars) return;
 
     const n = dc.length;
-    // Entry point: cfg.lookback bars ago
-    const entryIdx  = n - cfg.lookback;
-    const exitIdx   = Math.min(entryIdx + cfg.hold, n - 1);
+    const entryIdx = n - cfg.lookback;
+    const exitIdx  = Math.min(entryIdx + cfg.hold, n - 1);
+    if (entryIdx < 20) return;
 
-    if (entryIdx < 20) return;   // not enough history
-
-    // Build a "snapshot" stock object at entryIdx so we can re-score historically
+    // Slice data up to entry point (no look-ahead)
     const c_ = dc.slice(0, entryIdx + 1);
     const h_ = dh.slice(0, entryIdx + 1);
     const l_ = dl.slice(0, entryIdx + 1);
     const v_ = dv.slice(0, entryIdx + 1);
-
     if (c_.length < 22) return;
 
     const entryPrice = c_[c_.length - 1];
-    const exitPrice  = dc[exitIdx];
+    if (!entryPrice) return;
 
-    if (!entryPrice || !exitPrice) return;
+    // Build weekly candles from slice
+    const wkly = [];
+    for (let i = 0; i + 4 < c_.length; i += 5) {
+      const wc=c_.slice(i,i+5),wh=h_.slice(i,i+5),wl=l_.slice(i,i+5),wv=v_.slice(i,i+5);
+      wkly.push({ o:c_[i], h:Math.max(...wh), l:Math.min(...wl), c:wc[wc.length-1], v:wv.reduce((a,b)=>a+b,0) });
+    }
 
-    // Rebuild stock snapshot for scoring
+    // Rebuild snapshot stock object at entry point
     const snap = {
       ...s,
       price:    entryPrice,
       e20:      ec(c_.slice(-25), 20),
       e50:      c_.length >= 55 ? ec(c_.slice(-55), 50) : entryPrice,
       rsi:      rc(c_.slice(-20), 14),
+      rsiW:     wkly.length >= 10 ? rc(wkly.map(w=>w.c).slice(-14), 14) : null,
       bb:       bbc(c_.slice(-20), 20),
       volRatio: (() => {
         const avgV = v_.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
         return (v_[v_.length-1] || avgV) / avgV;
       })(),
-      pct52:    (() => {
+      pct52: (() => {
         const w = c_.slice(-252), hi = Math.max(...w), lo = Math.min(...w);
-        return hi !== lo ? ((entryPrice - lo)/(hi - lo))*100 : 50;
+        return hi!==lo ? ((entryPrice-lo)/(hi-lo))*100 : 50;
       })(),
-      h52:      Math.max(...c_.slice(-252)),
-      l52:      Math.min(...c_.slice(-252)),
-      redDays:  (() => { let r=0; for(let i=c_.length-1;i>0;i--){if(c_[i]<c_[i-1])r++;else break;} return r; })(),
-      weekChg:  c_.length >= 6 ? ((entryPrice - c_[c_.length-6])/c_[c_.length-6])*100 : 0,
-      sr:       src(c_, h_, l_, entryPrice),
-      daily:    { c: c_, h: h_, l: l_, v: v_ },
-      weekly:   (() => {
-        const wk = [];
-        for (let i=0; i+4 < c_.length; i+=5) {
-          const wc=c_.slice(i,i+5),wh=h_.slice(i,i+5),wl=l_.slice(i,i+5),wv=v_.slice(i,i+5);
-          wk.push({ o:c_[i], h:Math.max(...wh), l:Math.min(...wl), c:wc[wc.length-1], v:wv.reduce((a,b)=>a+b,0) });
-        }
-        return wk;
-      })(),
-      spark: c_.slice(-20),
-      avgVol: v_.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1,
+      h52:     Math.max(...c_.slice(-252)),
+      l52:     Math.min(...c_.slice(-252)),
+      redDays: (() => { let r=0; for(let i=c_.length-1;i>0;i--){if(c_[i]<c_[i-1])r++;else break;} return r; })(),
+      weekChg: c_.length>=6 ? ((entryPrice - c_[c_.length-6])/c_[c_.length-6])*100 : 0,
+      sr:      src(c_, h_, l_, entryPrice),
+      daily:   { c:c_, h:h_, l:l_, v:v_ },
+      weekly:  wkly,
+      spark:   c_.slice(-20),
+      avgVol:  v_.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1,
       lastVol: v_[v_.length-1] || 0,
     };
 
-    // Score at entry point
-    const savedTF = ACTIVE_TF, savedSS = ACTIVE_SUBSTRAT;
-    ACTIVE_TF = tf; ACTIVE_SUBSTRAT = stratKey;
+    // Score at entry point (temporarily override globals)
+    const savedTF=ACTIVE_TF, savedSS=ACTIVE_SUBSTRAT;
+    ACTIVE_TF=tf; ACTIVE_SUBSTRAT=stratKey;
     const scored = scoreStock(snap);
-    ACTIVE_TF = savedTF; ACTIVE_SUBSTRAT = savedSS;
+    ACTIVE_TF=savedTF; ACTIVE_SUBSTRAT=savedSS;
 
-    if (scored.score < 50) return;  // only backtest stocks that would have been selected
+    if (scored.score < 50) return;
 
-    // R:R at entry
     const rr = scored.rrData;
+    const atr = calcATR(dh.slice(0, entryIdx+1), dl.slice(0, entryIdx+1), dc.slice(0, entryIdx+1), 14) || 0;
 
-    // Actual P/L
-    const retPct  = ((exitPrice - entryPrice) / entryPrice) * 100;
-    const won     = retPct > 0;
+    // ── Simulate trade bar by bar ─────────────────────────────────────────────
+    let slHit=false, slHitDay=null, tgtHit=false, tgtHitDay=null;
+    let trailingStop = rr?.stop || null;
+    let peakPrice = entryPrice;
 
-    // Stop-loss hit check (did price breach stop before exit?)
-    let slHit = false, slHitDay = null;
-    if (rr?.stop) {
-      for (let i = entryIdx+1; i <= exitIdx; i++) {
-        if (dl[i] <= rr.stop) { slHit = true; slHitDay = i - entryIdx; break; }
+    for (let i = entryIdx+1; i <= exitIdx; i++) {
+      const bar_h = dh[i], bar_l = dl[i], bar_c = dc[i];
+
+      // Update trailing stop: moves up when price makes new high
+      // Trailing rule: stop = peak - 2×ATR (for daily), or below swing low
+      if (atr > 0 && bar_h > peakPrice) {
+        peakPrice = bar_h;
+        const newTSL = peakPrice - 2 * atr;
+        if (trailingStop === null || newTSL > trailingStop) {
+          trailingStop = newTSL;
+        }
       }
+
+      // Target hit
+      if (!tgtHit && rr?.target && bar_h >= rr.target) {
+        tgtHit=true; tgtHitDay=i-entryIdx;
+      }
+      // Stop hit (trailing or fixed — whichever is higher)
+      const activeSL = trailingStop;
+      if (!slHit && activeSL && bar_l <= activeSL) {
+        slHit=true; slHitDay=i-entryIdx;
+      }
+      // Once both hit in same bar, stop wins (conservative)
+      if (slHit && tgtHit && slHitDay === tgtHitDay) { tgtHit=false; }
     }
 
-    // Target hit check
-    let tgtHit = false, tgtHitDay = null;
-    if (rr?.target) {
-      for (let i = entryIdx+1; i <= exitIdx; i++) {
-        if (dh[i] >= rr.target) { tgtHit = true; tgtHitDay = i - entryIdx; break; }
-      }
-    }
+    // Effective exit price
+    let effectiveExit = dc[exitIdx] || entryPrice;
+    let exitReason = `Time exit (${cfg.hold}d)`;
+    const trailingActive = trailingStop && rr?.stop && trailingStop > rr.stop + atr*0.1;
 
-    // Effective exit: if SL hit before target, SL defines outcome
-    let effectiveExit = exitPrice;
-    let exitReason = `Hold ${cfg.hold}d exit`;
-    if (slHit && (!tgtHit || slHitDay < tgtHitDay)) {
-      effectiveExit = rr.stop;
-      exitReason    = `Stop-loss hit (day ${slHitDay})`;
+    if (slHit && (!tgtHit || slHitDay <= tgtHitDay)) {
+      effectiveExit = trailingStop || rr?.stop || entryPrice;
+      exitReason = trailingActive
+        ? `Trailing SL hit (day ${slHitDay})`
+        : `Fixed SL hit (day ${slHitDay})`;
     } else if (tgtHit) {
       effectiveExit = rr.target;
-      exitReason    = `Target hit (day ${tgtHitDay})`;
+      exitReason = `Target hit ✅ (day ${tgtHitDay})`;
     }
-    const effectiveRet = ((effectiveExit - entryPrice) / entryPrice) * 100;
 
-    // Entry reason from top passing checks
-    const whyEnter = scored.checks.filter(ch => ch.pass).slice(0,3).map(ch => ch.label).join(' · ');
+    const effectiveRet = ((effectiveExit - entryPrice) / entryPrice) * 100;
+    const stopDist     = rr?.stop ? entryPrice - rr.stop : null;
+    const rrAchieved   = stopDist && stopDist > 0
+      ? +((effectiveExit - entryPrice) / stopDist).toFixed(2)
+      : null;
+
+    // Entry reasons: top 3 passing checks
+    const whyEnter = scored.checks.filter(ch=>ch.pass).slice(0,3).map(ch=>ch.label).join(' · ');
+
+    // Exit reasons (why you should have exited at target)
+    let whyExit = '';
+    if (tgtHit)     whyExit = `Reached S/R resistance ₹${rr?.target?.toFixed(1)} — original target hit`;
+    else if (slHit) whyExit = trailingActive
+      ? `Price fell below trailing stop (${2}× ATR below peak ₹${peakPrice.toFixed(1)})`
+      : `Price breached support at ₹${(rr?.stop||0).toFixed(1)} — initial risk level`;
+    else            whyExit = `Hold period elapsed (${cfg.hold} trading days)`;
+
+    // Dates
+    const entryDate = btFmtDate(ts[entryIdx]);
+    const exitDate  = btFmtDate(ts[exitIdx]);
 
     results.push({
-      sym:         s.symbol,
-      name:        s.name,
-      score:       scored.score,
-      entryPrice:  entryPrice,
-      exitPrice:   effectiveExit,
-      rawExit:     exitPrice,
-      retPct:      +effectiveRet.toFixed(2),
-      won:         effectiveRet > 0,
-      slHit,
-      tgtHit,
-      exitReason,
-      entryReason: whyEnter || scored.strat?.name || '',
-      stop:        rr?.stop  ? +rr.stop.toFixed(1)   : null,
-      target:      rr?.target ? +rr.target.toFixed(1) : null,
-      rrRatio:     rr?.rr    ? +rr.rr.toFixed(1)     : null,
-      entryIdx,
-      exitIdx,
+      sym:          s.symbol,
+      name:         s.name,
+      score:        scored.score,
+      entryPrice:   entryPrice,
+      exitPrice:    effectiveExit,
+      rawExitPrice: dc[exitIdx],
+      retPct:       +effectiveRet.toFixed(2),
+      won:          effectiveRet > 0,
+      slHit, tgtHit, slHitDay, tgtHitDay,
+      exitReason, whyEnter, whyExit,
+      stop:         rr?.stop      ? +rr.stop.toFixed(2)   : null,
+      target:       rr?.target    ? +rr.target.toFixed(2) : null,
+      trailStop:    trailingStop  ? +trailingStop.toFixed(2) : null,
+      rrPlanned:    rr?.rr        ? +rr.rr.toFixed(1)     : null,
+      rrAchieved,
+      entryDate, exitDate,
+      entryIdx, exitIdx,
     });
   });
 
-  if (!results.length) {
-    area.innerHTML = `<div class="empty">No stocks passed the strategy filter for this backtest period. Try loading more data or switching strategy.</div>`;
+  results.sort((a,b) => b.retPct - a.retPct);
+  return results;
+}
+
+// ── Display (can be called with search filter) ────────────────────────────────
+function btDisplayResults(searchQ) {
+  const tf       = BT_TF   || '5d';
+  const stratKey = BT_STRAT || 'rubber';
+  const strat    = getStrats(tf)[stratKey];
+  const TF_LABELS = { '5d':'last 4 weeks', '2w':'last 15 weeks', 'pos':'6 months back' };
+
+  let filtered = BT_RESULTS;
+  const q = (searchQ || '').trim().toUpperCase();
+  if (q) filtered = filtered.filter(r => r.sym.includes(q) || r.name.toUpperCase().includes(q));
+
+  const el = document.getElementById('bt-results');
+  if (!el) return;
+
+  if (!BT_RESULTS.length) {
+    el.innerHTML = `<div class="ibox" style="color:var(--yellow)">
+      ⚠️ No stocks passed <strong>${strat?.name||stratKey}</strong> filter for <strong>${TF_LABELS[tf]}</strong>.<br>
+      This means at the lookback point, no stock had 50%+ of the strategy's criteria aligned.<br>
+      Try a different strategy or timeframe.
+    </div>`;
     return;
   }
 
-  // Sort by absolute return for display
-  results.sort((a,b) => b.retPct - a.retPct);
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty">No results for "<strong>${q}</strong>"</div>`;
+    return;
+  }
 
-  // ── Summary stats ──────────────────────────────────────────────────────────
-  const wins     = results.filter(r => r.won);
-  const losses   = results.filter(r => !r.won);
-  const winRate  = (wins.length / results.length * 100).toFixed(1);
-  const avgWin   = wins.length   ? (wins.reduce((a,r)=>a+r.retPct,0)/wins.length).toFixed(2)   : '0';
-  const avgLoss  = losses.length ? (losses.reduce((a,r)=>a+r.retPct,0)/losses.length).toFixed(2): '0';
-  const avgRet   = (results.reduce((a,r)=>a+r.retPct,0)/results.length).toFixed(2);
-  const pfactor  = losses.length && +avgLoss !== 0
-    ? Math.abs((wins.length * +avgWin) / (losses.length * +avgLoss)).toFixed(2)
-    : '∞';
-  const slCount  = results.filter(r=>r.slHit && !r.tgtHit).length;
-  const tgtCount = results.filter(r=>r.tgtHit).length;
+  const wins     = filtered.filter(r=>r.won);
+  const losses   = filtered.filter(r=>!r.won);
+  const winRate  = filtered.length ? (wins.length/filtered.length*100).toFixed(1) : '0';
+  const avgWin   = wins.length   ? (wins.reduce((a,r)=>a+r.retPct,0)/wins.length).toFixed(2) : '0';
+  const avgLoss  = losses.length ? (losses.reduce((a,r)=>a+r.retPct,0)/losses.length).toFixed(2) : '0';
+  const avgRet   = filtered.length ? (filtered.reduce((a,r)=>a+r.retPct,0)/filtered.length).toFixed(2) : '0';
+  const pfactor  = losses.length && +avgLoss!==0
+    ? Math.abs((wins.length*+avgWin)/(losses.length*+avgLoss)).toFixed(2) : '∞';
+  const slCount  = filtered.filter(r=>r.slHit&&!r.tgtHit).length;
+  const tgtCount = filtered.filter(r=>r.tgtHit).length;
+  const tslCount = filtered.filter(r=>r.slHit && r.trailStop && r.trailStop > (r.stop||0)+1).length;
 
-  const fCol = v => +v >= 0 ? 'var(--green)' : 'var(--red)';
+  const fCol = v => +v>=0 ? 'var(--green)' : 'var(--red)';
   const fmt  = v => `${+v>=0?'+':''}${v}%`;
 
-  area.innerHTML = `
-    <div class="sh">🔁 Backtest — ${strat?.name || stratKey}
+  el.innerHTML = `
+    <!-- Summary header -->
+    <div class="sh" style="margin-top:0">🔁 ${strat?.name||stratKey}
       <div class="sh-line"></div>
-      <span style="font-size:.63rem;color:var(--muted2)">${cfg.label} · Last ${cfg.period}</span>
+      <span style="font-size:.63rem;color:var(--muted2)">${strat?.full||''} · ${TF_LABELS[tf]}</span>
     </div>
 
-    <!-- Summary cards -->
-    <div class="srow" style="flex-wrap:wrap;gap:8px;margin-bottom:16px">
-      <div class="bts" style="flex:1;min-width:90px">
+    <!-- Summary stats -->
+    <div class="srow" style="flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <div class="bts" style="flex:1;min-width:80px">
         <div class="btv" style="color:${+winRate>=55?'var(--green)':+winRate>=45?'var(--yellow)':'var(--red)'}">${winRate}%</div>
         <div class="btl">Win Rate</div>
       </div>
-      <div class="bts" style="flex:1;min-width:90px">
+      <div class="bts" style="flex:1;min-width:80px">
         <div class="btv" style="color:${fCol(avgRet)}">${fmt(avgRet)}</div>
         <div class="btl">Avg Return</div>
       </div>
-      <div class="bts" style="flex:1;min-width:90px">
+      <div class="bts" style="flex:1;min-width:80px">
         <div class="btv" style="color:var(--green)">${fmt(avgWin)}</div>
         <div class="btl">Avg Win</div>
       </div>
-      <div class="bts" style="flex:1;min-width:90px">
+      <div class="bts" style="flex:1;min-width:80px">
         <div class="btv" style="color:var(--red)">${fmt(avgLoss)}</div>
         <div class="btl">Avg Loss</div>
       </div>
-      <div class="bts" style="flex:1;min-width:90px">
+      <div class="bts" style="flex:1;min-width:80px">
         <div class="btv" style="color:${+pfactor>=2?'var(--green)':+pfactor>=1?'var(--yellow)':'var(--red)'}">${pfactor}x</div>
         <div class="btl">Profit Factor</div>
       </div>
-      <div class="bts" style="flex:1;min-width:90px">
-        <div class="btv">${wins.length}W · ${losses.length}L</div>
-        <div class="btl">of ${results.length} signals</div>
+      <div class="bts" style="flex:1;min-width:80px">
+        <div class="btv">${wins.length}W / ${losses.length}L</div>
+        <div class="btl">${filtered.length} signals${q?' (filtered)':''}</div>
       </div>
     </div>
 
-    <!-- Bar chart: distribution -->
+    <!-- Exit type breakdown -->
+    <div class="srow" style="margin-bottom:14px;flex-wrap:wrap;gap:6px">
+      <div class="pill"><strong style="color:var(--green)">${tgtCount}</strong> Target Hit</div>
+      <div class="pill"><strong style="color:var(--yellow)">${tslCount}</strong> Trailing SL</div>
+      <div class="pill"><strong style="color:var(--red)">${slCount-tslCount}</strong> Fixed SL Hit</div>
+      <div class="pill"><strong style="color:var(--muted2)">${filtered.length-tgtCount-slCount}</strong> Time Exit</div>
+    </div>
+
+    <!-- Distribution chart -->
     <div class="cwrap" style="margin-bottom:14px">
-      <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
-        Return Distribution — top signals
-      </div>
-      <div style="display:flex;flex-direction:column;gap:5px">
-        ${results.slice(0,15).map(r => {
-          const barW = Math.min(Math.abs(r.retPct) * 3, 100);
-          return `<div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:.68rem;font-weight:700;color:var(--text);min-width:80px">${r.sym}</span>
-            <div style="flex:1;height:14px;background:var(--border);border-radius:3px;overflow:hidden">
-              <div style="height:100%;width:${barW}%;background:${r.won?'rgba(0,212,154,.7)':'rgba(255,69,96,.7)'};border-radius:3px"></div>
+      <div style="font-size:.66rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Return Distribution</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${filtered.slice(0,14).map(r => {
+          const w = Math.min(Math.abs(r.retPct)*2.5, 100);
+          return `<div style="display:flex;align-items:center;gap:7px">
+            <span style="font-size:.67rem;font-weight:700;color:var(--text);min-width:76px;white-space:nowrap">${r.sym}</span>
+            <div style="flex:1;height:13px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${w}%;background:${r.won?'rgba(0,212,154,.65)':'rgba(255,69,96,.65)'};border-radius:3px"></div>
             </div>
-            <span style="font-size:.68rem;font-weight:700;color:${r.won?'var(--green)':'var(--red)'};min-width:50px;text-align:right">${fmt(r.retPct)}</span>
+            <span style="font-size:.67rem;font-weight:700;color:${r.won?'var(--green)':'var(--red)'};min-width:46px;text-align:right">${fmt(r.retPct)}</span>
           </div>`;
         }).join('')}
       </div>
     </div>
 
-    <!-- Exit breakdown -->
-    <div class="srow" style="margin-bottom:14px">
-      <div class="pill"><strong style="color:var(--green)">${tgtCount}</strong>Target Hit</div>
-      <div class="pill"><strong style="color:var(--red)">${slCount}</strong>Stop Loss Hit</div>
-      <div class="pill"><strong style="color:var(--muted2)">${results.length-tgtCount-slCount}</strong>Time Exit</div>
-    </div>
-
-    <!-- Detail table -->
+    <!-- Trade-by-trade table -->
     <div class="cwrap" style="padding:0;overflow:hidden">
-      <div style="padding:10px 14px;font-size:.67rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)">
-        Trade-by-Trade Breakdown
+      <div style="padding:10px 14px;font-size:.66rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)">
+        Trade-by-Trade Detail
       </div>
-      <div class="tw" style="overflow-x:auto">
-        <table style="min-width:560px">
+      <div style="overflow-x:auto">
+        <table style="min-width:700px;width:100%;border-collapse:collapse">
           <thead>
-            <tr>
-              <th>Stock</th>
-              <th>Entry ₹</th>
-              <th>Stop ₹</th>
-              <th>Target ₹</th>
-              <th>Exit ₹</th>
-              <th>Return</th>
-              <th>Exit Reason</th>
-              <th>Signal</th>
+            <tr style="background:var(--card2)">
+              <th style="padding:8px 10px;font-size:.65rem;text-align:left;font-weight:700;color:var(--muted2);white-space:nowrap">Stock</th>
+              <th style="padding:8px 6px;font-size:.65rem;text-align:left;font-weight:700;color:var(--muted2);white-space:nowrap">Entry Date</th>
+              <th style="padding:8px 6px;font-size:.65rem;text-align:right;font-weight:700;color:var(--muted2);white-space:nowrap">Entry ₹</th>
+              <th style="padding:8px 6px;font-size:.65rem;text-align:right;font-weight:700;color:var(--red);white-space:nowrap">SL ₹</th>
+              <th style="padding:8px 6px;font-size:.65rem;text-align:right;font-weight:700;color:var(--yellow);white-space:nowrap">Trail SL ₹</th>
+              <th style="padding:8px 6px;font-size:.65rem;text-align:right;font-weight:700;color:var(--green);white-space:nowrap">Target ₹</th>
+              <th style="padding:8px 6px;font-size:.65rem;text-align:left;font-weight:700;color:var(--muted2);white-space:nowrap">Exit Date</th>
+              <th style="padding:8px 6px;font-size:.65rem;text-align:right;font-weight:700;color:var(--muted2);white-space:nowrap">Exit ₹</th>
+              <th style="padding:8px 6px;font-size:.65rem;text-align:right;font-weight:700;color:var(--muted2);white-space:nowrap">Return</th>
+              <th style="padding:8px 6px;font-size:.65rem;text-align:center;font-weight:700;color:var(--muted2);white-space:nowrap">R:R Plan/Got</th>
+              <th style="padding:8px 10px;font-size:.65rem;text-align:left;font-weight:700;color:var(--muted2)">Entry Signals · Exit Reason</th>
             </tr>
           </thead>
           <tbody>
-            ${results.map(r => `
-              <tr>
-                <td><strong style="color:var(--text)">${r.sym}</strong>
-                  <div style="font-size:.6rem;color:var(--muted2);max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.score}% match</div>
+            ${filtered.map((r,i) => `
+              <tr style="border-bottom:1px solid var(--border);background:${i%2===0?'var(--card)':'var(--card2)'}">
+                <td style="padding:8px 10px">
+                  <div style="font-weight:800;font-size:.78rem;color:var(--text)">${r.sym}</div>
+                  <div style="font-size:.6rem;color:var(--muted2)">${r.score}% match</div>
                 </td>
-                <td style="font-size:.74rem">₹${r.entryPrice.toFixed(1)}</td>
-                <td style="font-size:.72rem;color:var(--red)">${r.stop ? '₹'+r.stop : '—'}</td>
-                <td style="font-size:.72rem;color:var(--green)">${r.target ? '₹'+r.target : '—'}</td>
-                <td style="font-size:.74rem">₹${r.exitPrice.toFixed(1)}</td>
-                <td style="font-weight:800;font-size:.8rem;color:${r.won?'var(--green)':'var(--red)'}">
-                  ${fmt(r.retPct)}
+                <td style="padding:8px 6px;font-size:.68rem;color:var(--muted2);white-space:nowrap">${r.entryDate}</td>
+                <td style="padding:8px 6px;font-size:.74rem;font-weight:700;color:var(--text);text-align:right;white-space:nowrap">₹${r.entryPrice.toFixed(1)}</td>
+                <td style="padding:8px 6px;font-size:.7rem;color:var(--red);text-align:right;white-space:nowrap">${r.stop ? '₹'+r.stop : '—'}</td>
+                <td style="padding:8px 6px;font-size:.7rem;text-align:right;white-space:nowrap">
+                  ${r.trailStop && r.trailStop > (r.stop||0)+0.5
+                    ? `<span style="color:var(--yellow);font-weight:700">₹${r.trailStop}</span>`
+                    : '<span style="color:var(--muted2)">—</span>'}
                 </td>
-                <td style="font-size:.65rem;color:var(--muted2);max-width:110px">${r.exitReason}</td>
-                <td>
-                  <div style="font-size:.6rem;color:var(--muted2);max-width:140px;line-height:1.3">${r.entryReason}</div>
+                <td style="padding:8px 6px;font-size:.7rem;color:var(--green);text-align:right;white-space:nowrap">${r.target ? '₹'+r.target : '—'}</td>
+                <td style="padding:8px 6px;font-size:.68rem;color:var(--muted2);white-space:nowrap">${r.exitDate}</td>
+                <td style="padding:8px 6px;font-size:.74rem;font-weight:700;color:var(--text);text-align:right;white-space:nowrap">₹${r.exitPrice.toFixed(1)}</td>
+                <td style="padding:8px 6px;text-align:right;white-space:nowrap">
+                  <span style="font-size:.82rem;font-weight:800;color:${r.won?'var(--green)':'var(--red)'}">${fmt(r.retPct)}</span>
+                  <div style="font-size:.58rem;color:${r.won?'var(--green)':'var(--red)'}">
+                    ${r.tgtHit ? '✅ Win' : r.slHit ? '🛑 SL' : '⏱ Time'}
+                  </div>
+                </td>
+                <td style="padding:8px 6px;text-align:center;white-space:nowrap">
+                  <div style="font-size:.7rem;color:var(--muted2)">1:${r.rrPlanned||'?'}</div>
+                  <div style="font-size:.7rem;font-weight:700;color:${r.rrAchieved>=1?'var(--green)':r.rrAchieved>=0?'var(--yellow)':'var(--red)'}">
+                    ${r.rrAchieved!==null ? (r.rrAchieved>=0?'1:'+r.rrAchieved:r.rrAchieved+'×') : '—'}
+                  </div>
+                </td>
+                <td style="padding:8px 10px;min-width:200px">
+                  <div style="font-size:.63rem;color:var(--muted2);line-height:1.4;margin-bottom:3px">
+                    📥 <em>${r.whyEnter || '—'}</em>
+                  </div>
+                  <div style="font-size:.63rem;color:${r.tgtHit?'var(--green)':r.slHit?'var(--red)':'var(--muted2)'};line-height:1.4">
+                    📤 ${r.whyExit}
+                  </div>
                 </td>
               </tr>`).join('')}
           </tbody>
@@ -2605,13 +2768,14 @@ function rBT() {
       </div>
     </div>
 
-    <!-- Methodology note -->
-    <div class="ibox" style="margin-top:12px;font-size:.67rem;line-height:1.6">
-      <strong>Methodology:</strong> Each stock is re-scored using <strong>${strat?.name||stratKey}</strong> strategy criteria
-      at a point <strong>${cfg.lookback} bars ago</strong> using only data available at that time (no look-ahead bias).
-      Stocks scoring ≥50% are simulated with a <strong>${cfg.hold}-bar hold</strong>.
-      Entry = close on signal day. Exit = first of: target hit, stop-loss hit, or ${cfg.hold}-bar time exit.
-      Stop and target from pivot S/R or ATR-based levels. <em>Past performance does not guarantee future results.</em>
+    <!-- Methodology -->
+    <div class="ibox" style="margin-top:12px;font-size:.66rem;line-height:1.6">
+      <strong>Methodology:</strong> Each stock re-scored on <strong>${strat?.name||stratKey}</strong> using only data available at entry date (no look-ahead).
+      Stocks scoring ≥50% simulated with <strong>${tf==='5d'?5:tf==='2w'?14:60}-bar hold</strong>.
+      Entry = close on signal day. Exit = first of: target, trailing stop (2×ATR below peak), fixed SL, or time exit.
+      <strong>Trailing SL</strong> activates once price moves above entry and tightens as stock rises.
+      Dates shown are actual trading days from Yahoo Finance data — verify on TradingView.
+      <em>Past performance is not indicative of future results.</em>
     </div>
   `;
 }
@@ -2635,6 +2799,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('alc').textContent=ALT.filter(a=>!a.triggered).length;
   // Initialize strategy panel — default to 5-Day
   setTF('5d');
+  // Auto-load data on page open
+  setTimeout(loadData, 400);
 });
 </script>
 

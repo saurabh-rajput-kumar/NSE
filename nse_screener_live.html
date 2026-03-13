@@ -837,8 +837,17 @@ async function fetchS(sym) {
     if (vld.length < 22) return null;
 
     const price  = meta.regularMarketPrice || vld[vld.length - 1].c;
-    const prev   = meta.chartPreviousClose  || vld[vld.length - 2]?.c || price;
-    const pct    = ((price - prev) / prev) * 100;
+    // Use Yahoo's own calculated change% — most reliable, already accounts for corp actions
+    // Fallback: compute from last two adjusted daily bars (NOT chartPreviousClose which is unadjusted)
+    let pct;
+    if (meta.regularMarketChangePercent != null && isFinite(meta.regularMarketChangePercent)) {
+      pct = meta.regularMarketChangePercent;
+    } else {
+      const prev2 = vld[vld.length - 2]?.c || price;
+      pct = prev2 > 0 ? ((price - prev2) / prev2) * 100 : 0;
+    }
+    // Hard cap: NSE circuit breaker = ±20%. Anything beyond is bad data (bonus/split metadata mismatch)
+    pct = Math.max(-20, Math.min(20, pct));
     const mcap   = meta.marketCap || 0;
     const name   = meta.longName || meta.shortName || decodeURIComponent(sym);
     const sector = SM[sym] || 'Others';
@@ -867,7 +876,8 @@ async function fetchS(sym) {
     for (let i = c_.length - 1; i > 0; i--) { if (c_[i] < c_[i-1]) red++; else break; }
 
     const wkAgo = c_[c_.length - 6] || c_[0];
-    const wkChg = ((price - wkAgo) / wkAgo) * 100;
+    const wkChgRaw = wkAgo > 0 ? ((price - wkAgo) / wkAgo) * 100 : 0;
+    const wkChg = Math.max(-40, Math.min(40, wkChgRaw)); // sanity cap ±40%
 
     const sr = src(c_, h_, l_, price);
 

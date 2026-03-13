@@ -1459,51 +1459,81 @@ function rc2p(a){
 }
 
 // ── RISK:REWARD CALCULATOR ───────────────────────────────────────────────────
-// Entry  = current price
-// Stop   = nearest support below price (from pivot lows), or ATR-based floor
-// Target = nearest resistance above price (from pivot highs)
+// Entry  = current price (daily close)
+// Stop   = ATR(14)-based OR lowest swing-low of last 10 days — whichever gives
+//          a MEANINGFUL stop. Hard limits: min 1.5% below, max 8% below entry.
+//          Pivot formula (S1/S2/S3) removed — too noisy, gives near-zero stops.
+// Target = lowest pivot high above price, or 2.5× risk projection
 // Returns { entry, stop, target, rr, passes } where passes = rr >= 2.0
 function calcRR(s) {
   const price = s.price;
-  if (!price || !s.sr) return { entry: price, stop: null, target: null, rr: null, passes: false };
+  const dh = s.daily?.h, dl = s.daily?.l, dc = s.daily?.c;
+  if (!price) return { entry: price, stop: null, target: null, rr: null, passes: false };
 
-  // Best stop: highest support BELOW price
-  const supports    = (s.sr.s || []).filter(v => v < price);
-  const resistances = (s.sr.r || []).filter(v => v > price);
-
-  // Fallback stop: ATR-proxy = avg of last 10 daily ranges * 1.5
-  let stop = null;
-  if (supports.length > 0) {
-    stop = Math.max(...supports);           // nearest support below
-  } else if (s.daily?.h && s.daily?.l) {
-    const atrSlice = s.daily.h.slice(-10).map((h, i) => h - s.daily.l.slice(-10)[i]);
-    const atr = atrSlice.reduce((a, b) => a + b, 0) / atrSlice.length;
-    stop = price - atr * 1.5;
-  } else {
-    stop = price * 0.94;                    // last-resort: 6% below
+  // ── ATR(14) — true daily volatility ──────────────────────────────────────
+  let atr = price * 0.02; // 2% default
+  if (dh && dl && dc && dh.length >= 15) {
+    const trs = [];
+    for (let i = dh.length - 14; i < dh.length; i++) {
+      trs.push(Math.max(
+        dh[i] - dl[i],
+        Math.abs(dh[i] - dc[i-1]),
+        Math.abs(dl[i] - dc[i-1])
+      ));
+    }
+    atr = trs.reduce((a,b)=>a+b,0) / trs.length;
+  } else if (s.bb) {
+    atr = (s.bb.u - s.bb.l) / 4;
   }
 
-  // Best target: lowest resistance ABOVE price
+  // ── Stop: lowest daily low of last 10 bars (swing low) ───────────────────
+  let swingStop = null;
+  if (dl && dl.length >= 5) {
+    swingStop = Math.min(...dl.slice(-10));
+  }
+
+  // ── Choose stop: swing low if it gives meaningful distance ───────────────
+  // Meaningful = at least 1×ATR below price, not more than 4×ATR (too wide)
+  const minStopDist = atr * 1.0;
+  const maxStopDist = atr * 4.0;
+
+  let stop;
+  if (swingStop && (price - swingStop) >= minStopDist && (price - swingStop) <= maxStopDist) {
+    stop = swingStop;                 // use swing low — it's a real level
+  } else {
+    stop = price - atr * 1.5;        // ATR-based fallback
+  }
+
+  // Hard limits: stop must be 1.5% – 8% below entry (NSE reality check)
+  stop = Math.min(stop, price * 0.985);  // at least 1.5% below
+  stop = Math.max(stop, price * 0.92);   // no more than 8% below
+
+  // ── Target: nearest pivot high above price ────────────────────────────────
+  const risk = price - stop;
   let target = null;
-  if (resistances.length > 0) {
-    target = Math.min(...resistances);
-  } else {
-    // No resistance found — project using 2x the stop distance
-    const risk = price - stop;
-    target = price + risk * 2;
+  if (dh && dh.length >= 10) {
+    const pivotHighs = [];
+    for (let i = 1; i < Math.min(50, dh.length - 1); i++) {
+      if (dh[i] > dh[i-1] && dh[i] > (dh[i+1]||0)) pivotHighs.push(dh[i]);
+    }
+    const res = pivotHighs
+      .filter(v => v > price + risk * 0.5)  // must clear at least half the risk
+      .sort((a,b) => a-b);
+    if (res.length > 0 && res[0] < price + risk * 8) {
+      target = res[0];
+    }
   }
+  if (!target) target = price + risk * 2.5;  // 2.5× risk default
 
-  const risk   = price - stop;
   const reward = target - price;
-
-  if (risk <= 0) return { entry: price, stop, target, rr: null, passes: false };
+  if (risk <= 0 || reward <= 0) return { entry: price, stop: +stop.toFixed(2), target: null, rr: null, passes: false };
 
   const rr = reward / risk;
   return {
-    entry: +price.toFixed(2),
-    stop:  +stop.toFixed(2),
-    target:+target.toFixed(2),
-    rr:    +rr.toFixed(2),
+    entry:  +price.toFixed(2),
+    stop:   +stop.toFixed(2),
+    target: +target.toFixed(2),
+    rr:     +rr.toFixed(2),
     passes: rr >= 2.0
   };
 }
@@ -2986,40 +3016,57 @@ function btCompute(tf, stratKey) {
         const atr        = calcATR(dh.slice(0, bar+1), dl.slice(0, bar+1), dc.slice(0, bar+1), 14) || 0;
 
         // ── Simulate trade bar by bar ──────────────────────────────────────────
+        // Rules:
+        // 1. Trailing SL only ratchets UP — never falls below initial fixed SL
+        // 2. Loop breaks immediately on first exit trigger (no post-exit drift)
+        // 3. trailStopAtExit captured at the exact bar where exit fires
         let slHit=false, slHitDay=null, tgtHit=false, tgtHitDay=null;
-        let trailingStop = rr?.stop || null;
+        const fixedSL    = rr?.stop || null;   // initial stop — hard floor
+        let trailingStop = fixedSL;            // starts at fixed SL, only moves UP
         let peakPrice    = entryPrice;
+        let trailStopAtExit = trailingStop;
 
         for (let i = bar+1; i <= exitIdx; i++) {
           const bar_h=dh[i], bar_l=dl[i];
 
-          // Update trailing stop when new high made
+          // Ratchet trail stop UP only — never let it go below the fixed SL
           if (atr > 0 && bar_h > peakPrice) {
             peakPrice = bar_h;
             const newTSL = peakPrice - 2 * atr;
-            if (trailingStop === null || newTSL > trailingStop) trailingStop = newTSL;
+            // Only raise the floor; never lower it below the original fixed SL
+            if (newTSL > (trailingStop ?? -Infinity) && newTSL > (fixedSL ?? -Infinity)) {
+              trailingStop = newTSL;
+            }
           }
 
-          // Target hit check
+          // Target hit (check bar high)
           if (!tgtHit && rr?.target && bar_h >= rr.target) {
             tgtHit=true; tgtHitDay=i-bar;
           }
-          // Stop hit check
-          const activeSL = trailingStop;
+          // Stop hit (check bar low vs active stop — trailing or fixed)
+          const activeSL = trailingStop ?? fixedSL;
           if (!slHit && activeSL && bar_l <= activeSL) {
             slHit=true; slHitDay=i-bar;
           }
           // Same-bar conflict: stop wins (conservative)
           if (slHit && tgtHit && slHitDay===tgtHitDay) tgtHit=false;
+
+          // Break on first exit — don't simulate beyond this point
+          if (slHit || tgtHit) {
+            trailStopAtExit = trailingStop;
+            break;
+          }
         }
+        if (!slHit && !tgtHit) trailStopAtExit = trailingStop; // time exit
 
         // Effective exit
         let effectiveExit = dc[exitIdx] || entryPrice;
         let exitReason = `Time exit (${cfg.hold}d)`;
-        const trailingActive = trailingStop && rr?.stop && trailingStop > (rr.stop + atr*0.1);
+        const trailingActive = trailStopAtExit && fixedSL &&
+          trailStopAtExit > (fixedSL + atr * 0.1);
 
         if (slHit && (!tgtHit || slHitDay <= tgtHitDay)) {
-          effectiveExit = trailingStop || rr?.stop || entryPrice;
+          effectiveExit = trailStopAtExit ?? fixedSL ?? entryPrice;
           exitReason    = trailingActive
             ? `Trailing SL hit (day ${slHitDay})`
             : `Fixed SL hit (day ${slHitDay})`;
@@ -3053,7 +3100,7 @@ function btCompute(tf, stratKey) {
           exitReason, whyEnter, whyExit,
           stop:        rr?.stop    ? +rr.stop.toFixed(2)    : null,
           target:      rr?.target  ? +rr.target.toFixed(2)  : null,
-          trailStop:   trailingStop ? +trailingStop.toFixed(2) : null,
+          trailStop:   trailStopAtExit && trailStopAtExit > (fixedSL||0) + 0.5 ? +trailStopAtExit.toFixed(2) : null,
           rrPlanned:   rr?.rr      ? +rr.rr.toFixed(1)      : null,
           rrAchieved,
           entryDate:   btFmtDate(ts[bar]),

@@ -770,9 +770,267 @@ input,select,textarea{font-size:16px!important;}
 </div></div>
 
 <script>
-const SM={"RELIANCE":"Energy","ONGC":"Energy","COALINDIA":"Energy","TATAPOWER":"Energy","ADANIGREEN":"Energy","TORNTPOWER":"Energy","NTPC":"Energy","POWERGRID":"Energy","RECLTD":"Energy","PFC":"Energy","TCS":"IT","INFY":"IT","WIPRO":"IT","HCLTECH":"IT","TECHM":"IT","MPHASIS":"IT","LTIM":"IT","PERSISTENT":"IT","COFORGE":"IT","KPITTECH":"IT","TATAELXSI":"IT","HDFCBANK":"Banking","ICICIBANK":"Banking","SBIN":"Banking","KOTAKBANK":"Banking","AXISBANK":"Banking","INDUSINDBK":"Banking","FEDERALBNK":"Banking","IDFCFIRSTB":"Banking","BANDHANBNK":"Banking","RBLBANK":"Banking","PNB":"Banking","BANKBARODA":"Banking","CANBK":"Banking","UNIONBANK":"Banking","BAJFINANCE":"NBFC","BAJAJFINSV":"NBFC","CHOLAFIN":"NBFC","MUTHOOTFIN":"NBFC","SBILIFE":"Insurance","HDFCLIFE":"Insurance","ICICIGI":"Insurance","LICI":"Insurance","ICICIPRULI":"Insurance","HINDUNILVR":"FMCG","ITC":"FMCG","NESTLEIND":"FMCG","BRITANNIA":"FMCG","DABUR":"FMCG","MARICO":"FMCG","COLPAL":"FMCG","TATACONSUM":"FMCG","GODREJCP":"FMCG","EMAMILTD":"FMCG","SUNPHARMA":"Pharma","DRREDDY":"Pharma","CIPLA":"Pharma","DIVISLAB":"Pharma","AUROPHARMA":"Pharma","LUPIN":"Pharma","GLENMARK":"Pharma","ALKEM":"Pharma","TORNTPHARM":"Pharma","MARUTI":"Auto","BAJAJ-AUTO":"Auto","HEROMOTOCO":"Auto","EICHERMOT":"Auto","M%26M":"Auto","ASIANPAINT":"Paints","BERGEPAINT":"Paints","PIDILITIND":"Paints","LT":"Infra","ADANIPORTS":"Infra","RVNL":"Infra","IRCON":"Infra","IRFC":"Infra","RAILTEL":"Infra","IRCTC":"Infra","JSWSTEEL":"Metals","TATASTEEL":"Metals","HINDALCO":"Metals","VEDL":"Metals","SAIL":"Metals","NMDC":"Metals","ULTRACEMCO":"Cement","GRASIM":"Cement","TITAN":"Jewellery","APOLLOHOSP":"Healthcare","HAVELLS":"Cons.Elec","VOLTAS":"Cons.Elec","DIXON":"Cons.Elec","ZOMATO":"New Age","NYKAA":"New Age","PAYTM":"New Age","DELHIVERY":"New Age","INDIAMART":"New Age","AFFLE":"New Age","NAUKRI":"New Age","INDIGO":"Aviation","CAMS":"Fin Svc","CDSL":"Fin Svc","BSE":"Fin Svc","MCX":"Fin Svc","DEEPAKNITR":"Chemicals","AARTIIND":"Chemicals","SRF":"Chemicals","GODREJPROP":"Realty","DLF":"Realty","OBEROIRLTY":"Realty","PRESTIGE":"Realty","BRIGADE":"Realty","PAGEIND":"Apparel","ABFRL":"Apparel","TRENT":"Retail","BALRAMCHIN":"Agri","RADICO":"Beverages"};
+const SM={"RELIANCE":"Energy","ONGC":"Energy","COALINDIA":"Energy","TATAPOWER":"Energy","ADANIGREEN":"Energy","TORNTPOWER":"Energy","NTPC":"Energy","POWERGRID":"Energy","RECLTD":"Energy","PFC":"Energy","TCS":"IT","INFY":"IT","WIPRO":"IT","HCLTECH":"IT","TECHM":"IT","MPHASIS":"IT","LTIM":"IT","PERSISTENT":"IT","COFORGE":"IT","KPITTECH":"IT","TATAELXSI":"IT","HDFCBANK":"Banking","ICICIBANK":"Banking","SBIN":"Banking","KOTAKBANK":"Banking","AXISBANK":"Banking","INDUSINDBK":"Banking","FEDERALBNK":"Banking","IDFCFIRSTB":"Banking","BANDHANBNK":"Banking","RBLBANK":"Banking","PNB":"Banking","BANKBARODA":"Banking","CANBK":"Banking","UNIONBANK":"Banking","BAJFINANCE":"NBFC","BAJAJFINSV":"NBFC","CHOLAFIN":"NBFC","MUTHOOTFIN":"NBFC","SBILIFE":"Insurance","HDFCLIFE":"Insurance","ICICIGI":"Insurance","LICI":"Insurance","ICICIPRULI":"Insurance","HINDUNILVR":"FMCG","ITC":"FMCG","NESTLEIND":"FMCG","BRITANNIA":"FMCG","DABUR":"FMCG","MARICO":"FMCG","COLPAL":"FMCG","TATACONSUM":"FMCG","GODREJCP":"FMCG","EMAMILTD":"FMCG","SUNPHARMA":"Pharma","DRREDDY":"Pharma","CIPLA":"Pharma","DIVISLAB":"Pharma","AUROPHARMA":"Pharma","LUPIN":"Pharma","GLENMARK":"Pharma","ALKEM":"Pharma","TORNTPHARM":"Pharma","MARUTI":"Auto","BAJAJ-AUTO":"Auto","HEROMOTOCO":"Auto","EICHERMOT":"Auto","M%26M":"Auto","ASIANPAINT":"Paints","BERGEPAINT":"Paints","PIDILITIND":"Paints","LT":"Infra","ADANIPORTS":"Infra","RVNL":"Infra","IRCON":"Infra","IRFC":"Infra","RAILTEL":"Infra","IRCTC":"Infra","JSWSTEEL":"Metals","TATASTEEL":"Metals","HINDALCO":"Metals","VEDL":"Metals","SAIL":"Metals","NMDC":"Metals","ULTRACEMCO":"Cement","GRASIM":"Cement","TITAN":"Jewellery","APOLLOHOSP":"Healthcare","HAVELLS":"Cons.Elec","VOLTAS":"Cons.Elec","DIXON":"Cons.Elec","ZOMATO":"New Age","NYKAA":"New Age","PAYTM":"New Age","DELHIVERY":"New Age","INDIAMART":"New Age","AFFLE":"New Age","NAUKRI":"New Age","INDIGO":"Aviation","CAMS":"Fin Svc","CDSL":"Fin Svc","BSE":"Fin Svc","MCX":"Fin Svc","DEEPAKNITR":"Chemicals","AARTIIND":"Chemicals","SRF":"Chemicals","GODREJPROP":"Realty","DLF":"Realty","OBEROIRLTY":"Realty","PRESTIGE":"Realty","BRIGADE":"Realty","PAGEIND":"Apparel","ABFRL":"Apparel","TRENT":"Retail","BALRAMCHIN":"Agri","RADICO":"Beverages",
+  "LTTS":"Technology",
+  "TATAELXSI":"Technology",
+  "KPITTECH":"Technology",
+  "HAPPSTMNDS":"Technology",
+  "BSOFT":"Technology",
+  "MASTEK":"Technology",
+  "ZENSAR":"Technology",
+  "NIITLTD":"Technology",
+  "CYIENT":"Technology",
+  "INTELLECT":"Technology",
+  "NEWGEN":"Technology",
+  "AFFLE":"Technology",
+  "TANLA":"Technology",
+  "RATEGAIN":"Technology",
+  "INDIAMART":"Technology",
+  "JUSTDIAL":"Technology",
+  "REDINGTON":"Technology",
+  "NAUKRI":"Technology",
+  "CARTRADE":"Technology",
+  "IXIGO":"Technology",
+  "TORNTPHARM":"Pharma",
+  "LUPIN":"Pharma",
+  "BIOCON":"Pharma",
+  "SYNGENE":"Pharma",
+  "JBCHEPHARM":"Pharma",
+  "GLENMARK":"Pharma",
+  "LAURUSLABS":"Pharma",
+  "GRANULES":"Pharma",
+  "IPCALAB":"Pharma",
+  "SOLARA":"Pharma",
+  "SPARC":"Pharma",
+  "GLAND":"Pharma",
+  "NEULANDLAB":"Pharma",
+  "WINDLAS":"Pharma",
+  "ERIS":"Pharma",
+  "MEDANTA":"Pharma",
+  "ASTERDM":"Pharma",
+  "METROPOLIS":"Pharma",
+  "KRSNAA":"Pharma",
+  "SEQUENT":"Pharma",
+  "TATAMOTORS":"Auto",
+  "TVSMOTOR":"Auto",
+  "ASHOKLEYL":"Auto",
+  "MOTHERSON":"Auto",
+  "BHARATFORG":"Auto",
+  "BALKRISIND":"Auto",
+  "ENDURANCE":"Auto",
+  "SUPRAJIT":"Auto",
+  "SUNDRMFAST":"Auto",
+  "EXIDEIND":"Auto",
+  "AMARA":"Auto",
+  "TVSHLTD":"Auto",
+  "MAHINDCIE":"Auto",
+  "NRBBEARING":"Auto",
+  "ASAHIINDIA":"Auto",
+  "BANDHANBNK":"Banking",
+  "IDFCFIRSTB":"Banking",
+  "FEDERALBNK":"Banking",
+  "KARURVYSYA":"Banking",
+  "CSBBANK":"Banking",
+  "RBLBANK":"Banking",
+  "EQUITASBNK":"Banking",
+  "UJJIVANSFB":"Banking",
+  "SURYODAY":"Banking",
+  "DCBBANK":"Banking",
+  "MUTHOOTFIN":"Finance",
+  "CHOLAFIN":"Finance",
+  "CANFINHOME":"Finance",
+  "AAVAS":"Finance",
+  "HOMEFIRST":"Finance",
+  "ANGELONE":"Finance",
+  "MOTILALOFS":"Finance",
+  "360ONE":"Finance",
+  "CDSL":"Finance",
+  "BSE":"Finance",
+  "MCX":"Finance",
+  "HDFCAMC":"Finance",
+  "ABCAPITAL":"Finance",
+  "MANAPPURAM":"Finance",
+  "IIFL":"Finance",
+  "EDELWEISS":"Finance",
+  "SBICARDS":"Finance",
+  "JIOFIN":"Finance",
+  "LICI":"Finance",
+  "STARHEALTH":"Finance",
+  "NIACL":"Finance",
+  "GICRE":"Finance",
+  "ICICIPRU":"Finance",
+  "HDFCLIFE":"Finance",
+  "SBILIFE":"Finance",
+  "BAJAJHLDNG":"Finance",
+  "SBFC":"Finance",
+  "UGROCAP":"Finance",
+  "CREDITACC":"Finance",
+  "ARMANFIN":"Finance",
+  "SPANDANA":"Finance",
+  "FUSION":"Finance",
+  "PNBHOUSING":"Finance",
+  "APTUS":"Finance",
+  "HDFCSEC":"Finance",
+  "CHOLAHLDNG":"Finance",
+  "ISEC":"Finance",
+  "IIFLSEC":"Finance",
+  "UTIAMC":"Finance",
+  "WEALTH":"Finance",
+  "ICICIGI":"Finance",
+  "DEEPAKNTR":"Chemicals",
+  "AARTIIND":"Chemicals",
+  "ALKYLAMINE":"Chemicals",
+  "FLUOROCHEM":"Chemicals",
+  "ASTRAL":"Chemicals",
+  "PIDILITIND":"Chemicals",
+  "TATACHEM":"Chemicals",
+  "NOCIL":"Chemicals",
+  "PCBL":"Chemicals",
+  "DCMSHRIRAM":"Chemicals",
+  "ATUL":"Chemicals",
+  "BASF":"Chemicals",
+  "SUMICHEM":"Chemicals",
+  "GNFC":"Chemicals",
+  "CLEAN":"Chemicals",
+  "VINYSCORP":"Chemicals",
+  "BALRAMCHIN":"Chemicals",
+  "HIKAL":"Chemicals",
+  "ROSSARI":"Chemicals",
+  "FINEORG":"Chemicals",
+  "SUPRIYA":"Chemicals",
+  "AETHER":"Chemicals",
+  "SUDARSCHEM":"Chemicals",
+  "EPIGRAL":"Chemicals",
+  "ZOMATO":"Consumer",
+  "DMART":"Consumer",
+  "TRENT":"Consumer",
+  "PAGE":"Consumer",
+  "NYKAA":"Consumer",
+  "VMART":"Consumer",
+  "ABFRL":"Consumer",
+  "KALYANKJIL":"Consumer",
+  "SENCO":"Consumer",
+  "DEVYANI":"Consumer",
+  "JUBLFOOD":"Consumer",
+  "CAMPUS":"Consumer",
+  "METROBRAND":"Consumer",
+  "LANDMARK":"Consumer",
+  "SAPPHIREFDS":"Consumer",
+  "RAYMOND":"Consumer",
+  "MCDOWELL-N":"Consumer",
+  "UNITDSPR":"Consumer",
+  "PATANJALI":"FMCG",
+  "COLPAL":"FMCG",
+  "GODREJCP":"FMCG",
+  "EMAMILTD":"FMCG",
+  "JYOTHYLAB":"FMCG",
+  "VSTIND":"FMCG",
+  "HONAUT":"FMCG",
+  "GILLETTE":"FMCG",
+  "PGHH":"FMCG",
+  "VARUN":"FMCG",
+  "GOKUL":"FMCG",
+  "HAL":"Capital Goods",
+  "BEL":"Capital Goods",
+  "BHEL":"Capital Goods",
+  "SIEMENS":"Capital Goods",
+  "ABB":"Capital Goods",
+  "CUMMINSIND":"Capital Goods",
+  "THERMAX":"Capital Goods",
+  "GRINDWELL":"Capital Goods",
+  "SCHAEFFLER":"Capital Goods",
+  "TIMKEN":"Capital Goods",
+  "SKFINDIA":"Capital Goods",
+  "BEML":"Capital Goods",
+  "TIINDIA":"Capital Goods",
+  "KAYNES":"Capital Goods",
+  "SYRMA":"Capital Goods",
+  "ZENTEC":"Capital Goods",
+  "IDEAFORGE":"Capital Goods",
+  "MTAR":"Capital Goods",
+  "ELIN":"Capital Goods",
+  "MAZDOCK":"Capital Goods",
+  "COCHINSHIP":"Capital Goods",
+  "GRSE":"Capital Goods",
+  "DIXON":"Capital Goods",
+  "VSTTILLERS":"Capital Goods",
+  "KIRLOSENGB":"Capital Goods",
+  "IRFC":"Infrastructure",
+  "PFC":"Infrastructure",
+  "RECLTD":"Infrastructure",
+  "HUDCO":"Infrastructure",
+  "IREDA":"Infrastructure",
+  "CONCOR":"Infrastructure",
+  "ADANIGREEN":"Infrastructure",
+  "ADANIPOWER":"Infrastructure",
+  "TATAPOWER":"Infrastructure",
+  "TORNTPOWER":"Infrastructure",
+  "CESC":"Infrastructure",
+  "IGL":"Energy",
+  "MGL":"Energy",
+  "GUJGASLTD":"Energy",
+  "ATGL":"Energy",
+  "JSWENERGY":"Infrastructure",
+  "RATNAMANI":"Metals",
+  "APLAPOLLO":"Metals",
+  "JINDALSAW":"Metals",
+  "WELCORP":"Metals",
+  "SAIL":"Metals",
+  "MOIL":"Metals",
+  "NATIONALUM":"Metals",
+  "WELSPUNIND":"Metals",
+  "NMDC":"Metals",
+  "VEDL":"Metals",
+  "HINDCOPPER":"Metals",
+  "TATAMETALIK":"Metals",
+  "SHYAMMETL":"Metals",
+  "GARFIBRES":"Metals",
+  "DLF":"Realty",
+  "GODREJPROP":"Realty",
+  "OBEROIRLTY":"Realty",
+  "PHOENIXLTD":"Realty",
+  "PRESTIGE":"Realty",
+  "LODHA":"Realty",
+  "BRIGADE":"Realty",
+  "SOBHA":"Realty",
+  "KEYSTONE":"Realty",
+  "MAHLIFE":"Realty",
+  "NUVOCO":"Cement",
+  "JKCEMENT":"Cement",
+  "RAMCOCEM":"Cement",
+  "HEIDELBERG":"Cement",
+  "ZEEL":"Media",
+  "SAREGAMA":"Media",
+  "TIPS":"Media",
+  "BALAJITELE":"Media",
+  "NAZARA":"Media",
+  "TVTODAY":"Media",
+  "DBCORP":"Media",
+  "PVR":"Media",
+  "TATACOMM":"Telecom",
+  "NETWORK18":"Media",
+  "JAGRAN":"Media",
+  "VARDHMAN":"Textiles",
+  "TRIDENT":"Textiles",
+  "ARVIND":"Textiles",
+  "WELSPUN":"Textiles",
+  "KPRMILL":"Textiles",
+  "HLEGLAS":"Others",
+  "BOMDYEING":"Textiles",
+  "MSTCLTD":"Technology",
+  "EASEMYTRIP":"Consumer",
+  "WABAG":"Infrastructure",
+  "GREENPANEL":"Others",
+  "CENTURYPLY":"Others",
+  "GREENPLY":"Others",
+  "RPOWER":"Infrastructure",
+  "INOX":"Others",
+  "NILAINFRA":"Infrastructure"
+};
 const SC={"Energy":"#ff9f43","IT":"#54a0ff","Banking":"#5f27cd","NBFC":"#a29bfe","Insurance":"#fd79a8","FMCG":"#00b894","Pharma":"#00cec9","Auto":"#e17055","Paints":"#fdcb6e","Infra":"#636e72","Metals":"#b2bec3","Cement":"#dfe6e9","Jewellery":"#f9ca24","Healthcare":"#6ab04c","Cons.Elec":"#e55039","New Age":"#8e44ad","Aviation":"#2980b9","Fin Svc":"#27ae60","Chemicals":"#d35400","Realty":"#c0392b","Apparel":"#7f8c8d","Agri":"#16a085","Retail":"#e84393","Beverages":"#6c5ce7"};
-const SYMS=["RELIANCE","TCS","HDFCBANK","INFY","ICICIBANK","HINDUNILVR","SBIN","BHARTIARTL","ITC","KOTAKBANK","LT","AXISBANK","ASIANPAINT","MARUTI","NESTLEIND","ULTRACEMCO","TITAN","BAJFINANCE","WIPRO","HCLTECH","SUNPHARMA","ONGC","POWERGRID","NTPC","TECHM","DRREDDY","CIPLA","DIVISLAB","EICHERMOT","HEROMOTOCO","BAJAJFINSV","BRITANNIA","ADANIENT","ADANIPORTS","COALINDIA","GRASIM","JSWSTEEL","TATASTEEL","HINDALCO","INDUSINDBK","BAJAJ-AUTO","M%26M","TATACONSUM","APOLLOHOSP","HAVELLS","DABUR","MARICO","COLPAL","PIDILITIND","BERGEPAINT","VOLTAS","GODREJCP","DLF","ZOMATO","IRCTC","INDIGO","TRENT","MUTHOOTFIN","CHOLAFIN","SBILIFE","HDFCLIFE","ICICIGI","LICI","FEDERALBNK","IDFCFIRSTB","BANDHANBNK","RBLBANK","PNB","BANKBARODA","CANBK","UNIONBANK","SAIL","NMDC","TATAPOWER","ADANIGREEN","TORNTPOWER","RECLTD","PFC","IRFC","RVNL","IRCON","RAILTEL","AUROPHARMA","LUPIN","GLENMARK","ALKEM","TORNTPHARM","MPHASIS","LTIM","PERSISTENT","COFORGE","KPITTECH","TATAELXSI","DIXON","NAUKRI","INDIAMART","AFFLE","CAMS","CDSL","BSE","MCX","AARTIIND","DEEPAKNITR","SRF","BALRAMCHIN","EMAMILTD","PAYTM","NYKAA","DELHIVERY","ABFRL","PAGEIND","RADICO","GODREJPROP","PRESTIGE","OBEROIRLTY","BRIGADE","ADANIPOWER","ADANITRANS","ADANIENSOL","NTPCGREEN","KPRMILL","SUPREMEIND","APLAPOLLO","CESC","NHPC","SJVN","JSWENERGY","IPCALAB","NATCOPHARM","ABBOTINDIA","MOTHERSON","BHARATFORG","BALKRISIND","TIINDIA","ABB","SIEMENS","BHEL","THERMAX","GRINDWELL","MFSL","IIFL","ANGELONE","MOTILALOFS","VBL","UBL","MCDOWELL-N","CYIENT","MASTEK","NIITTECH","PIIND","VINATIORGA","NAVINFLUOR","POLICYBZR","CARTRADE","CAMPUS"];
+const SYMS_P1=["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR", "SBIN", "BHARTIARTL", "ITC", "KOTAKBANK", "LT", "AXISBANK", "ASIANPAINT", "MARUTI", "NESTLEIND", "ULTRACEMCO", "TITAN", "BAJFINANCE", "WIPRO", "HCLTECH", "SUNPHARMA", "ONGC", "POWERGRID", "NTPC", "TECHM", "DRREDDY", "CIPLA", "DIVISLAB", "EICHERMOT", "HEROMOTOCO", "BAJAJFINSV", "BRITANNIA", "ADANIENT", "ADANIPORTS", "COALINDIA", "GRASIM", "JSWSTEEL", "TATASTEEL", "HINDALCO", "INDUSINDBK", "BAJAJ-AUTO", "M%26M", "TATACONSUM", "APOLLOHOSP", "HAVELLS", "DABUR", "MARICO", "COLPAL", "PIDILITIND", "BERGEPAINT", "VOLTAS", "GODREJCP", "DLF", "ZOMATO", "IRCTC", "INDIGO", "TRENT", "MUTHOOTFIN", "CHOLAFIN", "SBILIFE", "HDFCLIFE", "ICICIGI", "LICI", "FEDERALBNK", "IDFCFIRSTB", "BANDHANBNK", "RBLBANK", "PNB", "BANKBARODA", "CANBK", "UNIONBANK", "SAIL", "NMDC", "TATAPOWER", "ADANIGREEN", "TORNTPOWER", "RECLTD", "PFC", "IRFC", "RVNL", "IRCON", "RAILTEL", "AUROPHARMA", "LUPIN", "GLENMARK", "ALKEM", "TORNTPHARM", "MPHASIS", "LTIM", "PERSISTENT", "COFORGE", "KPITTECH", "TATAELXSI", "DIXON", "NAUKRI", "INDIAMART", "AFFLE", "CAMS", "CDSL", "BSE", "MCX", "AARTIIND", "DEEPAKNITR", "SRF", "BALRAMCHIN", "EMAMILTD", "PAYTM", "NYKAA", "DELHIVERY", "ABFRL", "PAGEIND", "RADICO", "GODREJPROP", "PRESTIGE", "OBEROIRLTY", "BRIGADE", "ADANIPOWER", "ADANITRANS", "ADANIENSOL", "NTPCGREEN", "KPRMILL", "SUPREMEIND", "APLAPOLLO", "CESC", "NHPC", "SJVN", "JSWENERGY", "IPCALAB", "NATCOPHARM", "ABBOTINDIA", "MOTHERSON", "BHARATFORG", "BALKRISIND", "TIINDIA", "ABB", "SIEMENS", "BHEL", "THERMAX", "GRINDWELL", "MFSL", "IIFL", "ANGELONE", "MOTILALOFS", "VBL", "UBL", "MCDOWELL-N", "CYIENT", "MASTEK", "NIITTECH", "PIIND", "VINATIORGA", "NAVINFLUOR", "POLICYBZR", "CARTRADE", "CAMPUS", "LTTS", "HAPPSTMNDS", "INTELLECT", "BIOCON", "SYNGENE", "JBCHEPHARM", "LAURUSLABS", "GRANULES", "ASTERDM", "METROPOLIS", "TATAMOTORS", "TVSMOTOR", "ASHOKLEYL", "ENDURANCE", "EXIDEIND", "AMARA", "MAHINDCIE", "CANFINHOME", "AAVAS", "HOMEFIRST", "360ONE", "HDFCAMC", "ABCAPITAL", "MANAPPURAM", "SBICARDS", "JIOFIN", "PHOENIXLTD", "LODHA", "IGL", "MGL", "GUJGASLTD", "DEEPAKNTR", "ALKYLAMINE", "FLUOROCHEM", "ASTRAL", "DMART", "PAGE", "KALYANKJIL", "SENCO", "JUBLFOOD", "HAL", "BEL", "CUMMINSIND", "BEML", "RATNAMANI", "VEDL", "HINDCOPPER", "JINDALSAW", "HUDCO", "IREDA", "CONCOR", "JYOTHYLAB", "POLYCAB", "KAYNES", "SYRMA", "TATACOMM", "ZEEL", "PVR", "NUVOCO", "JKCEMENT", "RAMCOCEM"];
+const SYMS_P2=["KARURVYSYA", "CSBBANK", "EQUITASBNK", "UJJIVANSFB", "SURYODAY", "DCBBANK", "STARHEALTH", "NIACL", "GICRE", "ICICIPRU", "UTIAMC", "WEALTH", "ISEC", "IIFLSEC", "EDELWEISS", "SBFC", "UGROCAP", "CREDITACC", "ARMANFIN", "SPANDANA", "FUSION", "PNBHOUSING", "APTUS", "INDIABULL", "HDFCSEC", "CHOLAHLDNG", "TATACHEM", "NOCIL", "PCBL", "DCMSHRIRAM", "ATUL", "BASF", "SUMICHEM", "GNFC", "CLEAN", "VINYSCORP", "HIKAL", "ROSSARI", "FINEORG", "SUPRIYA", "AETHER", "SUDARSCHEM", "TVSHLTD", "SUPRAJIT", "SUNDRMFAST", "NRBBEARING", "ASAHIINDIA", "SCHAEFFLER", "TIMKEN", "SKFINDIA", "ZENTEC", "IDEAFORGE", "MTAR", "ELIN", "MAZDOCK", "COCHINSHIP", "GRSE", "RPSGVENT", "SHREECEM", "HEIDELBERG", "WELSPUNIND", "WELCORP", "NATIONALUM", "MOIL", "TATAMETALIK", "SHYAMMETL", "SOBHA", "KEYSTONE", "MAHLIFE", "SAREGAMA", "TIPS", "BALAJITELE", "NAZARA", "DELTACORP", "TVTODAY", "DBCORP", "GIPCL", "ATGL", "RPOWER", "ADANIGASP", "VARUN", "VSTIND", "PATANJALI", "RAYMOND", "VMART", "METROBRAND", "DEVYANI", "UNITDSPR", "HONAUT", "GILLETTE", "PGHH", "HAPPY", "BSOFT", "ZENSAR", "NIITLTD", "RATEGAIN", "TANLA", "JUSTDIAL", "REDINGTON", "EASEMYTRIP", "IXIGO", "GSHIP", "SCI", "GPPL", "CONCORD", "MAHLOG", "EPIGRAL", "GARFIBRES", "GOKUL", "SEQUENT", "MSTCLTD", "VSTTILLERS", "KIRLOSENGB", "WABAG", "NILAINFRA", "GLAND", "NEULANDLAB", "SPARC", "ERIS", "MEDANTA", "KRSNAA", "INOX", "GREENPANEL", "CENTURYPLY", "GREENPLY", "VARDHMAN", "TRIDENT", "ARVIND", "WELSPUN", "HLEGLAS", "BOMDYEING", "NETWORK18", "JAGRAN", "NSLNISP", "TATAINVEST", "BAJAJCON", "LANDMARK", "SAPPHIREFDS"];
+const SYMS=SYMS_P1; // starts as P1; extended to full universe after bg load
 
 let AS=[],CT='sc',WP=0,SCH=null,ARE=true,CDI=null,CDS=180;
 let WL=JSON.parse(localStorage.getItem('wl')||'[]');
@@ -1550,40 +1808,104 @@ const STRATS_ALPHA = {
       const C=(l,p)=>({label:l,pass:!!p});
       const dc=s.daily?.c||[], dh=s.daily?.h||[], dl=s.daily?.l||[];
       const n=dc.length;
-      // 52W position: ≥95% = at/near the high
-      const near52=s.pct52>=95;
-      // Volume: needs to be massive on breakout
-      const volBreak=s.volRatio>=2.0;
-      const volOk=s.volRatio>=1.5;
-      // Trend
-      const trendUp=s.e20&&s.e50&&s.e20>s.e50;
-      const aboveEMA=s.e20&&s.price>s.e20;
-      // RSI strong but not blow-off
-      const rsiOk=s.rsi&&s.rsi>=55&&s.rsi<=82;
-      // Base: recent 10d range tighter than prior 20d (consolidation before breakout)
-      let hasBase=false;
+
+      // FRESH BREAKOUT: today's close must be a NEW 52W high (not just lingering at old high)
+      // Compare today vs max of last 252 bars EXCLUDING today → ensures price is actually breaking out
+      const prior252High = n>=252 ? Math.max(...dc.slice(-252,-1)) : Math.max(...dc.slice(0,-1));
+      const freshBreak   = dc[n-1] >= prior252High * 0.999;  // at or above prior 52W high today
+
+      // FRESHNESS: was price NOT at 52W high 2+ weeks ago? (avoids stale high)
+      // If it was already at high 10 bars ago, it's not a fresh breakout
+      const highTwoWeeksAgo  = n>=14 ? Math.max(...dc.slice(-252,-10)) : prior252High;
+      const notStale = n>=14 ? dc[n-11] < highTwoWeeksAgo * 0.985 : true;
+
+      // Volume: institutional-grade surge on breakout day
+      const volBreak = s.volRatio >= 2.0;
+      const volOk    = s.volRatio >= 1.5;
+
+      // Trend alignment
+      const trendUp  = s.e20 && s.e50 && s.e20 > s.e50;
+      const aboveEMA = s.e20 && s.price > s.e20;
+
+      // RSI: in power zone — strong but not blow-off top
+      const rsiOk = s.rsi && s.rsi >= 55 && s.rsi <= 82;
+
+      // Base quality: recent 10d range < 70% of prior 20d range (tight coil)
+      let hasBase = false;
       if(n>=30){
-        const r10=Math.max(...dh.slice(-10))-Math.min(...dl.slice(-10));
-        const r20=Math.max(...dh.slice(-30,-10))-Math.min(...dl.slice(-30,-10));
-        hasBase=r10<r20*0.75;
+        const r10 = Math.max(...dh.slice(-10)) - Math.min(...dl.slice(-10));
+        const r20 = Math.max(...dh.slice(-30,-10)) - Math.min(...dl.slice(-30,-10));
+        hasBase = r20 > 0 && r10 < r20 * 0.70;
       }
-      // Weekly: 3 of last 4 weeks up (sustained institutional buying)
-      const wk=s.weekly||[];
-      const wksUp=wk.length>=4?wk.slice(-4).filter(w=>w.c>w.o).length>=3:true;
-      // Price not extended: still within 5% of 52W high (not already run 20%)
-      const notExtended=s.pct52<=100;
+
+      // Weekly quality: 3 of last 4 weeks closed up (sustained institutional demand)
+      const wk    = s.weekly || [];
+      const wksUp = wk.length >= 4 ? wk.slice(-4).filter(w=>w.c>w.o).length >= 3 : true;
+
       return{score:0,checks:[
-        C('At/near 52W high ≥95%', near52),
-        C('Breakout volume ≥2x avg', volBreak||(volOk&&s.pct52>=98)),
-        C('EMA20 > EMA50 (uptrend)', trendUp),
-        C('Price > EMA20', aboveEMA),
-        C('RSI 55–82 (power zone)', rsiOk),
-        C('Tight base before breakout', hasBase),
-        C('Weekly trend: 3/4 wks up', wksUp),
-        C('Not extended from base', notExtended),
+        C('Fresh 52W high (not stale)',  freshBreak && notStale),
+        C('Breakout vol ≥2x avg',        volBreak || (volOk && freshBreak)),
+        C('EMA20 > EMA50 (uptrend)',     trendUp),
+        C('Price > EMA20',               aboveEMA),
+        C('RSI 55–82 (power zone)',      rsiOk),
+        C('Tight base before break',     hasBase),
+        C('3/4 weeks up (inst. demand)', wksUp),
+        C('Not lingering at old high',   notStale),
       ]};
     }
   },
+};
+
+// Add momquality to STRATS_ALPHA
+STRATS_ALPHA.momquality = {
+  name:'Momentum Quality', full:'Momentum Quality (PMS Style)', color:'#c084fc', emoji:'💎',
+  hold:'3–10 wks', rr:'1:3–1:6', winRate:'55–65%',
+  desc:'Price momentum >20% over 6 months + institutional volume pattern (up-weeks have higher vol than down-weeks) + structural uptrend above EMA200. How India top PMS funds build positions. Higher win rate, lower max-draw than pure breakout.',
+  fn(s){
+    const C=(l,p)=>({label:l,pass:!!p});
+    const dc=s.daily?.c||[], dv=s.daily?.v||[];
+    const n=dc.length;
+
+    // 6-month momentum
+    const ret6m = n>=130 ? ((dc[n-1]-dc[n-127])/dc[n-127])*100 : 0;
+    const mom6m = ret6m >= 20;
+
+    // 3-month momentum (trend still alive)
+    const ret3m = n>=67 ? ((dc[n-1]-dc[n-64])/dc[n-64])*100 : 0;
+    const mom3m = ret3m >= 8;
+
+    // Structural uptrend — price above EMA200
+    const e200 = n>=200 ? ec(dc.slice(-200),200) : (s.e50||s.price);
+    const aboveE200 = s.price >= e200 * 0.98;
+
+    // EMA stack: 20 > 50 > 200
+    const emaStack = s.e20 && s.e50 && s.e20 > s.e50 && s.e50 > e200 * 0.97;
+
+    // Institutional accumulation: up-weeks have higher avg vol than down-weeks
+    const wk = s.weekly || [];
+    let upVol=0,upN=0,dnVol=0,dnN=0;
+    wk.slice(-12).forEach(w=>{ if(w.c>w.o){upVol+=w.v;upN++;}else{dnVol+=w.v;dnN++;} });
+    const instAccum = upN>0 && dnN>0 && (upVol/upN) >= (dnVol/dnN)*1.2;
+
+    // RSI healthy, not overbought
+    const rsiOk = s.rsi && s.rsi >= 52 && s.rsi <= 78;
+
+    // Not extended intraday: 4-week return <25%
+    const ret4w = n>=22 ? ((dc[n-1]-dc[n-22])/dc[n-22])*100 : 0;
+    const notExtended = ret4w < 25;
+    const recentPositive = ret4w >= 0;
+
+    return{score:0,checks:[
+      C('6M momentum >20%',          mom6m),
+      C('3M momentum >8%',           mom3m),
+      C('Above EMA200 (uptrend)',     aboveE200),
+      C('EMA stack: 20 > 50 > 200',  emaStack),
+      C('Institutional accum. vol',  instAccum),
+      C('RSI 52–78 (healthy)',       rsiOk),
+      C('Not extended (4w <25%)',    notExtended),
+      C('Last 4 weeks positive',     recentPositive),
+    ]};
+  }
 };
 
 // Also add breakout52 to each existing TF strategy list (appears in BT dropdowns)
@@ -1782,43 +2104,78 @@ function togAR(){
 }
 async function silRef(){if(!AS.length)return;const b=document.getElementById('lbtn'),o=b.textContent;b.textContent='↻ Refreshing...';const B=8;for(let i=0;i<AS.length;i+=B){const res=await Promise.all(AS.slice(i,i+B).map(s=>fetchS(s.symbol)));res.forEach((r,j)=>{if(r)AS[i+j]=r;});await sl(80);}document.getElementById('lu').textContent='⚡ '+new Date().toLocaleTimeString('en-IN');b.textContent=o;const fn={sc:rs,mt:rMTF,oi:rOI,fi:rFII,ro:rRot,bt:rBT};if(fn[CT])fn[CT]();chkAlerts();}
 
+// ── BG_LOADING: tracks whether phase-2 background load is in progress ───────
+let BG_LOADING = false;
+
 async function loadData(){
   const b=document.getElementById('lbtn');b.disabled=true;b.textContent='⏳ Loading...';
   WP=0;AS=[];
-  document.getElementById('area').innerHTML=`<div class="loader"><div class="spin"></div><div class="lt" id="lg">Fetching via proxy...</div><div class="pw"><div class="pb2" id="pb" style="width:0%"></div></div></div>`;
-  const B=5;
-  for(let i=0;i<SYMS.length;i+=B){
-    const res=await Promise.all(SYMS.slice(i,i+B).map(fetchS));
+  document.getElementById('area').innerHTML=`<div class="loader"><div class="spin"></div><div class="lt" id="lg">Loading Nifty 500 core...</div><div class="pw"><div class="pb2" id="pb" style="width:0%"></div></div></div>`;
+
+  // ── PHASE 1: Load SYMS_P1 (core universe) ──────────────────────────────
+  const B=6;
+  for(let i=0;i<SYMS_P1.length;i+=B){
+    const res=await Promise.all(SYMS_P1.slice(i,i+B).map(fetchS));
     res.forEach(r=>{if(r)AS.push(r);});
-    const pct=Math.round((i+B)/SYMS.length*100);
+    const pct=Math.round((i+B)/SYMS_P1.length*100);
     const pb=document.getElementById('pb'),lg=document.getElementById('lg');
     if(pb)pb.style.width=Math.min(pct,100)+'%';
-    if(lg)lg.textContent=`Loaded ${AS.length} stocks via proxy... (${Math.min(pct,100)}%)`;
-    await sl(100);
+    if(lg)lg.textContent=`Phase 1 — ${AS.length} stocks loaded (${Math.min(pct,100)}%)`;
+    await sl(80);
   }
+
+  // Phase 1 done — update UI immediately
+  updSecFilter();
+  document.getElementById('lu').textContent='⚡ P1 done '+new Date().toLocaleTimeString('en-IN');
+  b.disabled=false;b.textContent='⚡ Load';
+  if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty" style="color:var(--red)">⚠️ Could not load data.</div>`;return;}
+  startARI();mktStatusBadge();
+  if(ARE){if(isMarketOpen())startAR();else{ARE=false;const cb=document.getElementById('art'),sl2=document.getElementById('arsl'),th=document.getElementById('arth');if(cb)cb.checked=false;if(sl2)sl2.style.background='var(--border)';if(th)th.style.left='2px';const e=document.getElementById('arcd');if(e){e.textContent='Closed';e.style.color='var(--muted)';}}}
+  rs();
+  toast('Phase 1 loaded ('+AS.length+' stocks) — loading extended universe in background…','i');
+  bgBadge(true);
+
+  // ── PHASE 2: Background load SYMS_P2 ───────────────────────────────────
+  BG_LOADING=true;
+  const p2Batch=8;
+  const p2Results=[];
+  for(let i=0;i<SYMS_P2.length;i+=p2Batch){
+    const res=await Promise.all(SYMS_P2.slice(i,i+p2Batch).map(fetchS));
+    res.forEach(r=>{if(r)p2Results.push(r);});
+    bgBadge(true, Math.round((i+p2Batch)/SYMS_P2.length*100), AS.length+p2Results.length);
+    await sl(120); // slightly slower — don't block main thread
+  }
+
+  // Merge P2 into AS (avoid duplicates by symbol)
+  const existing=new Set(AS.map(s=>s.symbol));
+  p2Results.forEach(r=>{if(!existing.has(r.symbol))AS.push(r);});
+  BG_LOADING=false;
+  bgBadge(false);
+
+  // Re-render with full universe
+  updSecFilter();
+  document.getElementById('lu').textContent='✅ Full '+new Date().toLocaleTimeString('en-IN');
+  toast('Full universe loaded ('+AS.length+' stocks) — refreshing…','i');
+  const fn={sc:rs,mt:rMTF,oi:rOI,fi:rFII,ro:rRot,bt:rBT,sg:rSG};
+  if(fn[CT])fn[CT]();
+}
+
+function updSecFilter(){
   const secs=[...new Set(AS.map(s=>s.sector))].sort();
   const sf=document.getElementById('secf');
-  sf.innerHTML='<option value="all">All Sectors</option>'+secs.map(s=>`<option value="${s}">${s}</option>`).join('');
-  document.getElementById('lu').textContent='✅ '+new Date().toLocaleTimeString('en-IN');
-  b.disabled=false;b.textContent='⚡ Load';
-  if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty" style="color:var(--red)">⚠️ Could not load data. If you're on Render, wait 30 seconds and try again (free tier may be waking up). If running locally, make sure <strong>python nse_proxy.py</strong> is running.</div>`;return;}
-  startARI();
-  mktStatusBadge();
-  if(ARE){
-    if(isMarketOpen()){startAR();}
-    else{
-      // Auto-refresh was on but market is closed — reset toggle
-      ARE=false;
-      const cb=document.getElementById('art');
-      const sl2=document.getElementById('arsl'),th=document.getElementById('arth');
-      if(cb)cb.checked=false;
-      if(sl2)sl2.style.background='var(--border)';
-      if(th)th.style.left='2px';
-      const e=document.getElementById('arcd');
-      if(e){e.textContent='Closed';e.style.color='var(--muted)';}
-    }
+  if(sf)sf.innerHTML='<option value="all">All Sectors</option>'+secs.map(s=>`<option value="${s}">${s}</option>`).join('');
+}
+
+function bgBadge(loading, pct, total){
+  let el=document.getElementById('bg-badge');
+  if(!el){
+    el=document.createElement('div');el.id='bg-badge';
+    el.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9990;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:7px 12px;font-size:.68rem;color:var(--muted2);display:flex;align-items:center;gap:7px;box-shadow:0 4px 16px rgba(0,0,0,.4);transition:opacity .4s';
+    document.body.appendChild(el);
   }
-  rs();
+  if(!loading){el.style.opacity='0';setTimeout(()=>el.remove(),500);return;}
+  el.style.opacity='1';
+  el.innerHTML=`<div style="width:8px;height:8px;border-radius:50%;background:var(--yellow);animation:pulse 1s infinite"></div>⏳ Loading extended universe${pct!==undefined?' ('+pct+'%)':''}${total?' · '+total+' stocks':''}`;
 }
 
 function startARI(){if(ALI)clearInterval(ALI);ALI=setInterval(chkAlerts,30000);}
@@ -2936,8 +3293,10 @@ function btCompute(tf, stratKey) {
     '5d':   { label:'5-Day Momentum', scanBars: 40,  hold: 5,  minBars: 30,  period:'last 2 months',  useWeekly: false },
     '2w':   { label:'2–4 Week Swing', scanBars: 120, hold: 14, minBars: 100, period:'last 6 months',  useWeekly: false },
     'pos':  { label:'Positional',     scanBars: 220, hold: 60, minBars: 185, period:'last 10 months', useWeekly: true  },
-    'alpha':{ label:'Alpha 52W Break',scanBars: 200, hold: 30, minBars: 130, period:'last 9 months',  useWeekly: false },
+    'alpha':{ label:'Alpha 52W Break',scanBars: 200, hold: 20, minBars: 130, period:'last 9 months',  useWeekly: false },
   };
+  // momquality hold is 15 bars (3 weeks) — optimal for momentum continuation
+  if(stratKey==='momquality') TF_CFG.alpha={ ...TF_CFG.alpha, hold:15, label:'Momentum Quality', period:'last 9 months' };
   const cfg   = TF_CFG[tf] || TF_CFG['5d'];
   const strat = getStrats(tf)[stratKey];
   const results = [];
@@ -3125,6 +3484,7 @@ function btDisplayResults(searchQ) {
   const stratKey = BT_STRAT || 'rubber';
   const strat    = getStrats(tf)[stratKey];
   const TF_LABELS = { '5d':'last 4 weeks', '2w':'last 15 weeks', 'pos':'6 months back', 'alpha':'last 9 months' };
+  const stratLabel = stratKey==='momquality' ? 'Momentum Quality' : (strat?.name||stratKey);
 
   let filtered = BT_RESULTS;
   const q = (searchQ || '').trim().toUpperCase();

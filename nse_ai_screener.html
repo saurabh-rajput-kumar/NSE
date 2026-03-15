@@ -1,0 +1,37 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>NSE AI Screener</title>
+<style>
+body{font-family:Arial;background:#0b0f1a;color:#e6edf3;padding:20px}
+h1{color:#58a6ff}
+button{padding:10px 18px;border:none;background:#238636;color:white;border-radius:6px;cursor:pointer}
+table{margin-top:20px;border-collapse:collapse;width:100%}
+th,td{padding:10px;border-bottom:1px solid #30363d;text-align:left}
+.signal{font-weight:bold}
+.gc{color:#f2cc60}
+.dc{color:#ff7b72}
+.up{color:#3fb950}
+</style>
+</head>
+<body>
+
+<h1>NSE Smart Trading Screener</h1>
+<button onclick="scan()">Run Scan</button>
+
+<table id="results">
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Price</th>
+<th>Signal</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<script src="engine.js"></script>
+</body>
+</html>

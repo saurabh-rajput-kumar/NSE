@@ -576,6 +576,7 @@ input,select,textarea{font-size:16px!important;}
   <div class="ntab" id="t-ps" onclick="gt('ps')">🧮 Sizer</div>
   <div class="ntab" id="t-jn" onclick="gt('jn')">📓 Journal</div>
   <div class="ntab" id="t-sg" onclick="gt('sg')">📡 Signals</div>
+  <div class="ntab" id="t-ai" onclick="gt('ai')">🤖 AI Analyze</div>
 </div>
 
 <!-- Strategy Panel: Timeframe tabs + Strategy cards -->
@@ -2285,7 +2286,7 @@ function bgBadge(loading, pct, total){
 
 function startARI(){if(ALI)clearInterval(ALI);ALI=setInterval(chkAlerts,30000);}
 
-function gt(t){CT=t;document.querySelectorAll('.ntab').forEach(e=>e.classList.remove('active'));const e=document.getElementById('t-'+t);if(e)e.classList.add('active');document.getElementById('cbar').style.display=t==='sc'?'flex':'none';document.getElementById('tf-panel').style.display=t==='sc'?'block':'none';const fn={sc:rs,mt:rMTF,oi:rOI,fi:rFII,ro:rRot,ca:rCal,nw:rNews,bt:rBT,ps:rPS,jn:rJnl,sg:rSG};if(fn[t])fn[t]();}
+function gt(t){CT=t;document.querySelectorAll('.ntab').forEach(e=>e.classList.remove('active'));const e=document.getElementById('t-'+t);if(e)e.classList.add('active');document.getElementById('cbar').style.display=t==='sc'?'flex':'none';document.getElementById('tf-panel').style.display=t==='sc'?'block':'none';const fn={sc:rs,mt:rMTF,oi:rOI,fi:rFII,ro:rRot,ca:rCal,nw:rNews,bt:rBT,ps:rPS,jn:rJnl,sg:rSG,ai:rAI};if(fn[t])fn[t]();}
 
 function getSD(){const m={};AS.forEach(s=>{const sec=s.sector||'Others';if(!m[sec])m[sec]={n:0,d:0,w:0};m[sec].n++;m[sec].d+=s.pctChange;m[sec].w+=s.weekChg||0;});return Object.entries(m).map(([name,d])=>{const avgD=d.d/d.n,avgW=d.w/d.n;const state=avgW>1.5?'Momentum':avgW<-1.5?'Selling':Math.abs(avgW)<0.5?'Ranging':'Recovering';return{name,avgD,avgW,state};}).sort((a,b)=>b.avgW-a.avgW);}
 
@@ -3014,6 +3015,11 @@ function rSG() {
 
 function sgSwitch(view) {
   SG_VIEW = view;
+  // Stop TV polling if switching away
+  if (view !== 'tvalerts' && TV_POLL_INTERVAL) {
+    clearInterval(TV_POLL_INTERVAL);
+    TV_POLL_INTERVAL = null;
+  }
   sgRender(view);
 }
 
@@ -3028,9 +3034,25 @@ function sgRender(view) {
         <option value="movers"    ${view==='movers'    ?'selected':''}>🚀 Big Movers — Day gain >6%</option>
         <option value="delivery"  ${view==='delivery'  ?'selected':''}>📦 Delivery Buying — Investment volume >80%</option>
         <option value="goldcross" ${view==='goldcross' ?'selected':''}>✨ Golden Cross — EMA50 × EMA200 signals</option>
+        <option value="tvalerts"  ${view==='tvalerts'  ?'selected':''}>📡 TV Alerts — Live TradingView signals</option>
       </select>
     </div>`;
 
+  if (view === 'tvalerts') {
+    // TV Alerts has its own live-polling render — inject container then start polling
+    area.innerHTML = ctrl + `
+      <div class="sh">📡 TradingView Live Alerts
+        <div class="sh-line"></div>
+        <span style="font-size:.63rem;color:var(--muted2)">Polling every 15s</span>
+      </div>
+      <div class="ibox" style="font-size:.69rem;margin-bottom:12px">
+        Signals arrive here when TradingView Pine Script alerts fire with your webhook URL.
+        Set up in <strong>AI Analyze</strong> tab → copy Pine Script → paste in TV → create alert with webhook.
+      </div>
+      <div id="tv-signal-list"><div class="loader" style="margin:20px auto"><div class="spin"></div></div></div>`;
+    sgTVAlerts();
+    return;
+  }
   area.innerHTML = ctrl + (view === 'movers' ? sgMovers() : view === 'goldcross' ? sgGoldCross() : sgDelivery());
 }
 
@@ -3439,6 +3461,414 @@ function sgGoldCross() {
     ${renderGroup('Riding the Cross (gap widening)', '📈', 'var(--accent)', riding)}
     ${renderGroup('Approaching Cross (within 2%)', '🔜', 'var(--yellow)', approaching)}
   `;
+}
+
+
+// ── AI ANALYZE TAB ──────────────────────────────────────────────────────────
+let AI_STATE = { loading: false, result: null };
+
+function rAI() {
+  const area = document.getElementById('area');
+  area.innerHTML = `
+    <div class="sh">🤖 AI Strategy Analyzer
+      <div class="sh-line"></div>
+      <span style="font-size:.63rem;color:var(--muted2)">Powered by Claude</span>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-bottom:16px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+        <div style="flex:1;min-width:140px">
+          <label style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Symbol (NSE)</label>
+          <input id="ai-sym" class="c" placeholder="e.g. LTTS, RELIANCE, INFY"
+            style="font-size:.82rem;padding:9px 12px;width:100%;box-sizing:border-box"
+            onkeydown="if(event.key==='Enter')aiAnalyze()"/>
+        </div>
+        <div style="flex:0 0 auto">
+          <label style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Timeframe</label>
+          <select id="ai-tf" class="c" style="font-size:.8rem;padding:9px 12px">
+            <option value="daily">📅 Daily (2yr data)</option>
+            <option value="15min">⚡ 15-Min (60d data)</option>
+          </select>
+        </div>
+        <div style="flex:0 0 auto">
+          <button onclick="aiAnalyze()" id="ai-btn"
+            style="background:linear-gradient(135deg,#6c63ff,#4f8ef7);color:#fff;border:none;
+                   padding:9px 22px;border-radius:10px;font-size:.82rem;font-weight:700;
+                   cursor:pointer;white-space:nowrap;transition:opacity .2s">
+            🔍 Analyze
+          </button>
+        </div>
+      </div>
+      <div style="font-size:.65rem;color:var(--muted2);margin-top:10px;line-height:1.6">
+        Claude analyzes OHLCV price action → generates a custom strategy → backtests it → writes Pine Script for TradingView.
+        <strong style="color:var(--yellow)">Requires ANTHROPIC_API_KEY set on Render.</strong>
+      </div>
+    </div>
+
+    <div id="ai-result">${AI_STATE.result ? aiRenderResult(AI_STATE.result) : aiRenderEmpty()}</div>
+  `;
+}
+
+function aiRenderEmpty() {
+  return `
+    <div style="text-align:center;padding:40px 20px;color:var(--muted2)">
+      <div style="font-size:2.5rem;margin-bottom:12px">🤖</div>
+      <div style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:6px">Enter a symbol and click Analyze</div>
+      <div style="font-size:.7rem;line-height:1.7">
+        Works for any NSE stock · Daily or 15-min timeframe<br>
+        Targets ≥55% win rate with minimum 1:2 R:R on every trade<br>
+        Outputs: Strategy rules · Backtest results · Ready-to-paste Pine Script
+      </div>
+    </div>`;
+}
+
+async function aiAnalyze() {
+  const sym = (document.getElementById('ai-sym')?.value || '').trim().toUpperCase();
+  const tf  = document.getElementById('ai-tf')?.value || 'daily';
+  if (!sym) { toast('Enter a symbol first', 'dn'); return; }
+  if (AI_STATE.loading) return;
+
+  AI_STATE.loading = true;
+  const btn = document.getElementById('ai-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Analyzing...'; }
+
+  const steps = [
+    { id:'s1', label:`Fetching ${sym} ${tf} data from Yahoo Finance…` },
+    { id:'s2', label:'Claude analyzing price action & indicators…' },
+    { id:'s3', label:'Running backtest on historical data…' },
+    { id:'s4', label:'Generating Pine Script for TradingView…' },
+  ];
+
+  document.getElementById('ai-result').innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:20px">
+      <div style="font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:14px">🔄 Analyzing ${sym}…</div>
+      ${steps.map((s,i) => `
+        <div id="${s.id}" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;opacity:${i===0?1:0.35};transition:opacity .3s">
+          <div id="${s.id}-icon" style="width:22px;height:22px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:.7rem;flex-shrink:0">
+            ${i===0?'<div style="width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:spin .7s linear infinite"></div>':'⬜'}
+          </div>
+          <span style="font-size:.72rem;color:var(--muted2)">${s.label}</span>
+        </div>`).join('')}
+    </div>`;
+
+  // Animate steps sequentially while waiting
+  const stepTimes = [0, 2000, 8000, 14000];
+  stepTimes.forEach((delay, i) => {
+    setTimeout(() => {
+      const el = document.getElementById(`s${i+1}`);
+      const icon = document.getElementById(`s${i+1}-icon`);
+      if (el) el.style.opacity = '1';
+      if (i > 0 && icon) {
+        // Mark previous step done
+        const prev = document.getElementById(`s${i}-icon`);
+        if (prev) prev.innerHTML = '✅';
+        icon.innerHTML = '<div style="width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:spin .7s linear infinite"></div>';
+      }
+    }, delay);
+  });
+
+  try {
+    const resp = await fetch(`${PROXY_BASE}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: sym, timeframe: tf }),
+      signal: AbortSignal.timeout(90000),
+    });
+    const data = await resp.json();
+
+    // Mark all steps done
+    for (let i = 1; i <= 4; i++) {
+      const icon = document.getElementById(`s${i}-icon`);
+      if (icon) icon.innerHTML = '✅';
+      const el = document.getElementById(`s${i}`);
+      if (el) el.style.opacity = '1';
+    }
+
+    AI_STATE.result = data;
+    setTimeout(() => {
+      document.getElementById('ai-result').innerHTML = aiRenderResult(data);
+    }, 400);
+
+  } catch(e) {
+    document.getElementById('ai-result').innerHTML = `
+      <div class="ibox" style="color:var(--red)">
+        ❌ Analysis failed: ${e.message || 'Network error'}.<br>
+        Make sure ANTHROPIC_API_KEY is set on Render, then redeploy.
+      </div>`;
+  } finally {
+    AI_STATE.loading = false;
+    const b = document.getElementById('ai-btn');
+    if (b) { b.disabled = false; b.textContent = '🔍 Analyze'; }
+  }
+}
+
+function aiRenderResult(data) {
+  if (!data.viable) {
+    return `
+      <div class="ibox" style="border-left:3px solid var(--yellow)">
+        <strong style="color:var(--yellow)">⚠️ No viable strategy found for ${data.symbol}</strong><br>
+        <span style="font-size:.72rem">${data.message || 'Could not find a strategy meeting ≥55% win rate and 1:2 R:R requirements.'}</span>
+        ${data.indicators ? `<div style="margin-top:10px;font-size:.68rem;color:var(--muted2)">
+          Price: ₹${data.indicators.price} · RSI: ${data.indicators.rsi14} · EMA20: ₹${data.indicators.ema20}
+        </div>` : ''}
+      </div>`;
+  }
+
+  const s   = data.strategy || {};
+  const bt  = data.backtest || {};
+  const st  = bt.stats || {};
+  const trades = bt.trades || [];
+
+  // Strategy type color
+  const typeColor = {
+    trend_following: '#4f8ef7', breakout: '#ff6b35',
+    momentum: '#c084fc', mean_reversion: '#00d49a'
+  }[s.type] || '#fbbf24';
+
+  // Backtest stats
+  const wrColor = st.win_rate >= 60 ? 'var(--green)' : st.win_rate >= 50 ? 'var(--yellow)' : 'var(--red)';
+  const pfColor = st.profit_factor >= 2 ? 'var(--green)' : st.profit_factor >= 1 ? 'var(--yellow)' : 'var(--red)';
+
+  const pine = (data.pine_script || '').trim();
+
+  return `
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,${typeColor}18,${typeColor}08);border:1px solid ${typeColor}30;
+                border-radius:12px;padding:14px 16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:1.1rem">🤖</span>
+        <div style="flex:1">
+          <div style="font-size:.9rem;font-weight:800;color:var(--text)">${s.name || data.symbol+' Strategy'}</div>
+          <div style="font-size:.67rem;color:var(--muted2);margin-top:2px">
+            ${data.symbol} · ${data.timeframe} · ${data.bars_analyzed} bars analyzed ·
+            <span style="background:${typeColor}18;color:${typeColor};border:1px solid ${typeColor}30;padding:1px 7px;border-radius:8px">${s.type||'strategy'}</span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.67rem;color:var(--muted2)">Expected</div>
+          <div style="font-size:.8rem;font-weight:700;color:var(--green)">${s.expected_win_rate||'?'}% WR · 1:${s.expected_rr||'?'} R:R</div>
+        </div>
+      </div>
+      ${s.rationale ? `<div style="font-size:.68rem;color:var(--muted2);margin-top:10px;padding-top:10px;border-top:1px solid ${typeColor}20;line-height:1.6">${s.rationale}</div>` : ''}
+    </div>
+
+    <!-- Strategy Rules -->
+    <div class="cwrap" style="padding:14px;margin-bottom:12px">
+      <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 Strategy Rules</div>
+
+      <div style="margin-bottom:10px">
+        <div style="font-size:.7rem;font-weight:700;color:var(--green);margin-bottom:6px">📥 Entry Conditions (ALL required)</div>
+        ${(s.entry_conditions||[]).map(e => `
+          <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:5px">
+            <span style="color:var(--green);font-size:.75rem;flex-shrink:0">✓</span>
+            <span style="font-size:.71rem;color:var(--text)">${e.description || e.indicator+' '+e.operator+' '+e.value}</span>
+          </div>`).join('')}
+      </div>
+
+      <div style="margin-bottom:10px">
+        <div style="font-size:.7rem;font-weight:700;color:var(--red);margin-bottom:6px">📤 Exit Rules</div>
+        ${(s.exit_conditions||[]).map(e => `
+          <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:5px">
+            <span style="color:${e.trigger==='target'?'var(--green)':'var(--red)'};font-size:.75rem;flex-shrink:0">
+              ${e.trigger==='target'?'🎯':e.trigger==='stop_loss'?'🛑':'⏱'}
+            </span>
+            <span style="font-size:.71rem;color:var(--text)">${e.description || e.trigger+': '+e.method}</span>
+          </div>`).join('')}
+      </div>
+
+      ${(s.filters||[]).length ? `
+      <div>
+        <div style="font-size:.7rem;font-weight:700;color:var(--yellow);margin-bottom:6px">🔍 Quality Filters</div>
+        ${s.filters.map(f => `
+          <div style="font-size:.69rem;color:var(--muted2);margin-bottom:3px">⬡ ${f}</div>`).join('')}
+      </div>` : ''}
+    </div>
+
+    <!-- Backtest Stats -->
+    ${st.total ? `
+    <div class="cwrap" style="padding:14px;margin-bottom:12px">
+      <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📊 Backtest Results · ${data.timeframe} · ${data.bars_analyzed} bars</div>
+      <div class="srow" style="flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div class="bts" style="flex:1;min-width:70px">
+          <div class="btv" style="color:${wrColor}">${st.win_rate}%</div>
+          <div class="btl">Win Rate</div>
+        </div>
+        <div class="bts" style="flex:1;min-width:70px">
+          <div class="btv" style="color:${st.avg_ret>=0?'var(--green)':'var(--red)'}">${st.avg_ret>=0?'+':''}${st.avg_ret}%</div>
+          <div class="btl">Avg Return</div>
+        </div>
+        <div class="bts" style="flex:1;min-width:70px">
+          <div class="btv" style="color:var(--green)">${st.avg_win>=0?'+':''}${st.avg_win}%</div>
+          <div class="btl">Avg Win</div>
+        </div>
+        <div class="bts" style="flex:1;min-width:70px">
+          <div class="btv" style="color:var(--red)">${st.avg_loss}%</div>
+          <div class="btl">Avg Loss</div>
+        </div>
+        <div class="bts" style="flex:1;min-width:70px">
+          <div class="btv" style="color:${pfColor}">${st.profit_factor}x</div>
+          <div class="btl">Profit Factor</div>
+        </div>
+        <div class="bts" style="flex:1;min-width:70px">
+          <div class="btv">${st.wins}W / ${st.losses}L</div>
+          <div class="btl">${st.total} trades</div>
+        </div>
+      </div>
+      <div class="srow" style="margin-bottom:12px;flex-wrap:wrap;gap:6px">
+        <div class="pill"><strong style="color:var(--green)">${st.target_hits||0}</strong> Target Hit</div>
+        <div class="pill"><strong style="color:var(--red)">${st.sl_hits||0}</strong> SL Hit</div>
+        <div class="pill"><strong style="color:var(--muted2)">${st.time_exits||0}</strong> Time Exit</div>
+      </div>
+      <!-- Trade distribution -->
+      <div style="display:flex;flex-direction:column;gap:3px">
+        ${trades.slice(0,12).map(t => {
+          const w = Math.min(Math.abs(t.ret_pct)*3, 100);
+          return `<div style="display:flex;align-items:center;gap:7px">
+            <span style="font-size:.64rem;color:var(--muted2);min-width:64px;white-space:nowrap">${t.entry_date}</span>
+            <div style="flex:1;height:11px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${w}%;background:${t.won?'rgba(0,212,154,.6)':'rgba(255,69,96,.6)'};border-radius:3px"></div>
+            </div>
+            <span style="font-size:.64rem;font-weight:700;color:${t.won?'var(--green)':'var(--red)'};min-width:44px;text-align:right">${t.ret_pct>=0?'+':''}${t.ret_pct}%</span>
+            <span style="font-size:.58rem;color:var(--muted2);min-width:36px">${t.exit_reason}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : `
+    <div class="ibox" style="color:var(--yellow);margin-bottom:12px">
+      ⚠️ No backtest trades generated. The strategy conditions may be too strict for the available data period.
+    </div>`}
+
+    <!-- Pine Script -->
+    ${pine ? `
+    <div class="cwrap" style="padding:0;overflow:hidden;margin-bottom:12px">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:.74rem;font-weight:700;color:var(--text)">🌲 Pine Script v5 — Ready to paste into TradingView</div>
+          <div style="font-size:.63rem;color:var(--muted2);margin-top:2px">
+            Includes entry/exit alerts · Set alert webhook URL to:
+            <code style="background:var(--card3);padding:1px 6px;border-radius:4px;font-size:.62rem">${PROXY_BASE}/api/tv-signal</code>
+          </div>
+        </div>
+        <button onclick="aiCopyPine()" id="pine-copy-btn"
+          style="background:rgba(79,142,247,.15);color:#4f8ef7;border:1px solid rgba(79,142,247,.3);
+                 padding:6px 14px;border-radius:8px;font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap">
+          📋 Copy
+        </button>
+      </div>
+      <pre id="pine-code" style="margin:0;padding:14px;font-size:.62rem;color:#cdd6f4;
+           background:var(--card3);overflow-x:auto;max-height:320px;line-height:1.5;
+           white-space:pre;font-family:'Fira Code',monospace">${pine.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+    </div>
+
+    <!-- TradingView Setup Instructions -->
+    <div class="cwrap" style="padding:14px;margin-bottom:12px">
+      <div style="font-size:.7rem;font-weight:700;color:var(--text);margin-bottom:10px">📺 How to use in TradingView</div>
+      ${[
+        ['1','Open TradingView → Pine Script Editor (bottom panel)'],
+        ['2','Paste the copied code → Click "Add to chart"'],
+        ['3','Click "Alerts" (bell icon) → Create Alert'],
+        ['4','Set Condition: your strategy → "alert() function calls only"'],
+        ['5',`Set Webhook URL: <code style="background:var(--card3);padding:1px 5px;border-radius:4px">${PROXY_BASE}/api/tv-signal</code>`],
+        ['6','Click Create — alerts will now appear in your Signals tab'],
+      ].map(([n,text]) => `
+        <div style="display:flex;gap:10px;margin-bottom:8px;align-items:flex-start">
+          <div style="width:20px;height:20px;border-radius:50%;background:rgba(79,142,247,.2);color:#4f8ef7;
+                      font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${n}</div>
+          <span style="font-size:.69rem;color:var(--muted2);line-height:1.5">${text}</span>
+        </div>`).join('')}
+    </div>` : ''}
+
+    <!-- Current Indicators -->
+    ${data.indicators ? `
+    <div class="cwrap" style="padding:14px">
+      <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📈 Current Indicators</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:.68rem">
+        ${[
+          ['Price',    '₹'+data.indicators.price,                   'var(--text)'],
+          ['EMA20',    data.indicators.ema20 ? '₹'+data.indicators.ema20 : '—', 'var(--accent)'],
+          ['EMA50',    data.indicators.ema50 ? '₹'+data.indicators.ema50 : '—', 'var(--muted2)'],
+          ['EMA200',   data.indicators.ema200 ? '₹'+data.indicators.ema200 : '—', 'var(--muted2)'],
+          ['RSI(14)',  data.indicators.rsi14,                       data.indicators.rsi14>70?'var(--red)':data.indicators.rsi14<40?'var(--green)':'var(--yellow)'],
+          ['ATR(14)',  '₹'+data.indicators.atr14,                   'var(--muted2)'],
+          ['Vol Ratio',data.indicators.vol_ratio+'x',               data.indicators.vol_ratio>1.5?'var(--green)':'var(--muted2)'],
+        ].map(([l,v,col]) => `
+          <div style="background:var(--card2);border:1px solid var(--border);padding:5px 10px;border-radius:8px">
+            <div style="color:var(--muted2);font-size:.6rem">${l}</div>
+            <div style="color:${col};font-weight:700">${v}</div>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+  `;
+}
+
+function aiCopyPine() {
+  const el = document.getElementById('pine-code');
+  if (!el) return;
+  const text = el.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('pine-copy-btn');
+    if (btn) { btn.textContent = '✅ Copied!'; setTimeout(() => btn.textContent = '📋 Copy', 2000); }
+    toast('Pine Script copied to clipboard', 'i');
+  }).catch(() => toast('Copy failed — select manually', 'dn'));
+}
+
+
+// ── TV Alerts view (4th Signals tab option) ──────────────────────────────────
+let TV_POLL_INTERVAL = null;
+
+function sgTVAlerts() {
+  const area = document.getElementById('area');
+  // Start polling
+  if (!TV_POLL_INTERVAL) {
+    TV_POLL_INTERVAL = setInterval(fetchTVSignals, 15000);
+  }
+  fetchTVSignals();
+}
+
+async function fetchTVSignals() {
+  try {
+    const r = await fetch(`${PROXY_BASE}/api/tv-signals?limit=50`, {
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    renderTVSignals(data.signals || [], data.total || 0);
+  } catch(e) {}
+}
+
+function renderTVSignals(signals, total) {
+  const el = document.getElementById('tv-signal-list');
+  if (!el) return;
+
+  if (!signals.length) {
+    el.innerHTML = `
+      <div class="ibox" style="color:var(--yellow)">
+        No TradingView signals received yet.<br>
+        <span style="font-size:.68rem">Set up Pine Script alerts with webhook URL:
+          <code style="background:var(--card3);padding:1px 6px;border-radius:4px">${PROXY_BASE}/api/tv-signal</code>
+        </span>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = signals.map(s => {
+    const isBuy  = s.action.includes('BUY')  || s.action.includes('LONG');
+    const isSell = s.action.includes('SELL') || s.action.includes('SHORT') || s.action.includes('EXIT');
+    const col = isBuy ? 'var(--green)' : isSell ? 'var(--red)' : 'var(--accent)';
+    const emoji = isBuy ? '📈' : isSell ? '📉' : '📡';
+    return `
+      <div class="cwrap" style="padding:12px;border-left:3px solid ${col}">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:.85rem;font-weight:800;color:var(--text)">${emoji} ${s.symbol}</span>
+          <span style="font-size:.74rem;font-weight:700;color:${col};background:${col}15;
+                       border:1px solid ${col}30;padding:1px 8px;border-radius:8px">${s.action}</span>
+          ${s.price ? `<span style="font-size:.74rem;color:var(--text)">₹${s.price}</span>` : ''}
+          ${s.timeframe ? `<span style="font-size:.64rem;color:var(--muted2)">${s.timeframe}</span>` : ''}
+          <span style="font-size:.63rem;color:var(--muted2);margin-left:auto">${s.dt}</span>
+        </div>
+        ${s.strategy ? `<div style="font-size:.64rem;color:var(--muted2);margin-top:4px">Strategy: ${s.strategy}</div>` : ''}
+      </div>`;
+  }).join('');
 }
 
 // ── Visitor stats polling ─────────────────────────────────────────────────────

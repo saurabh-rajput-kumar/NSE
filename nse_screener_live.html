@@ -1909,6 +1909,110 @@ STRATS_ALPHA.momquality = {
   }
 };
 
+// ── Golden Cross: 50 EMA crosses above 200 EMA (daily) ─────────────────────
+// Detects 4 states: Fresh (last 3 bars), Recent (last 10 bars),
+// Riding (EMA50 > EMA200, gap widening), Approaching (within 2%).
+// Quality filter: cross + volume + price above both EMAs.
+STRATS_ALPHA.goldcross = {
+  name:'Golden Cross', full:'EMA50 × EMA200 Golden Cross', color:'#fbbf24', emoji:'✨',
+  hold:'4–12 wks', rr:'1:3–1:8', winRate:'55–62%',
+  desc:'EMA50 crossing above EMA200 on daily chart — classic institutional trend-change signal. Detects Fresh (≤3 bars), Recent (≤10 bars), Riding (gap widening), and Approaching crosses. Filtered: requires price above both EMAs and volume confirmation.',
+  fn(s){
+    const C=(l,p)=>({label:l,pass:!!p});
+    const dc=s.daily?.c||[], dv=s.daily?.v||[];
+    const n=dc.length;
+    if(n < 205) return {score:0, checks:[
+      C('Enough data (205+ bars)', false),
+      C('EMA50 > EMA200',          false),
+      C('Cross type detected',     false),
+      C('Price above EMA50',       false),
+      C('Price above EMA200',      false),
+      C('Volume confirmation',     false),
+      C('EMA200 slope positive',   false),
+      C('RSI 45–72',               false),
+    ]};
+
+    // Compute EMA50 and EMA200 for last ~15 bars to detect cross
+    // We need a small history of EMA values, not just the current one
+    const ema = (arr, p) => {
+      const k = 2/(p+1); let e = arr[0];
+      for(let i=1;i<arr.length;i++) e = arr[i]*k + e*(1-k);
+      return e;
+    };
+
+    // Build rolling EMA50 and EMA200 for last 15 bars
+    const e50arr=[], e200arr=[];
+    for(let i=n-15; i<=n-1; i++){
+      e50arr.push(ema(dc.slice(Math.max(0,i-60), i+1), 50));
+      e200arr.push(ema(dc.slice(Math.max(0,i-210), i+1), 200));
+    }
+    const len = e50arr.length;
+    const curE50  = e50arr[len-1];
+    const curE200 = e200arr[len-1];
+    const prevE50_3  = e50arr[len-4]  || e50arr[0];
+    const prevE200_3 = e200arr[len-4] || e200arr[0];
+    const prevE50_10 = e50arr[len-11] || e50arr[0];
+    const prevE200_10= e200arr[len-11]|| e200arr[0];
+
+    // ── Signal type detection ──────────────────────────────────────────────
+    // Fresh: EMA50 > EMA200 NOW, but was below 3 bars ago
+    const isFresh      = curE50 > curE200 && prevE50_3 <= prevE200_3;
+    // Recent: EMA50 > EMA200 NOW, was below 10 bars ago
+    const isRecent     = curE50 > curE200 && prevE50_10 <= prevE200_10 && !isFresh;
+    // Riding: EMA50 already above EMA200, gap widening (EMA50-EMA200 bigger than 3 bars ago)
+    const curGap       = curE50 - curE200;
+    const prevGap3     = prevE50_3 - prevE200_3;
+    const isRiding     = curE50 > curE200 && curGap > prevGap3 * 1.05 && !isFresh && !isRecent;
+    // Approaching: EMA50 below EMA200 but within 2%, moving up
+    const pctGap       = curE200 > 0 ? (curE200 - curE50)/curE200*100 : 99;
+    const isApproaching= curE50 < curE200 && pctGap <= 2.0 && curE50 > prevE50_3;
+
+    const crossDetected= isFresh || isRecent || isRiding || isApproaching;
+
+    // Signal label for display
+    const crossLabel = isFresh       ? 'Fresh ✨ (≤3 bars)'
+                     : isRecent      ? 'Recent (≤10 bars)'
+                     : isRiding      ? 'Riding (gap widening)'
+                     : isApproaching ? 'Approaching (within 2%)'
+                     : 'No cross signal';
+
+    // ── Quality filters ────────────────────────────────────────────────────
+    // Price above both EMAs (not lagging cross after price already dropped)
+    const priceAboveE50  = s.price > curE50;
+    const priceAboveE200 = s.price > curE200;
+
+    // Volume: above-average on or near cross (20d avg)
+    const avgVol = dv.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
+    const volOk  = (dv[n-1]||0) >= avgVol * 1.1;  // at least 10% above avg
+
+    // EMA200 slope positive (200 EMA itself rising — not a dead cat bounce)
+    const e200_10dAgo = e200arr[len-11] || e200arr[0];
+    const e200Rising  = curE200 > e200_10dAgo * 0.999;
+
+    // RSI: healthy zone — not already overbought
+    const rsiOk = s.rsi && s.rsi >= 45 && s.rsi <= 72;
+
+    return{score:0, checks:[
+      C(crossLabel,               crossDetected),
+      C('EMA50 ≥ EMA200 (or near)',curE50 >= curE200 * 0.98),
+      C('Price above EMA50',       priceAboveE50),
+      C('Price above EMA200',      priceAboveE200),
+      C('Volume ≥ avg (confirm)',  volOk),
+      C('EMA200 slope rising',     e200Rising),
+      C('RSI 45–72',               rsiOk),
+      C('Not extended (RSI<73)',   s.rsi && s.rsi < 73),
+    ]};
+  }
+};
+
+// Add goldcross to STRATS_POS (positional variant — 4-12 week hold)
+STRATS_POS.goldcross = {
+  name:'Golden Cross', full:'EMA50×EMA200 (Positional)', color:'#fbbf24', emoji:'✨',
+  hold:'4–12 wks', rr:'1:3–1:8', winRate:'55–62%',
+  desc:'EMA50 crossing above EMA200 on daily chart. All 4 states: Fresh / Recent / Riding / Approaching. Filtered: price above both EMAs + volume + EMA200 slope positive.',
+  fn: STRATS_ALPHA.goldcross.fn
+};
+
 // Also add breakout52 to each existing TF strategy list (appears in BT dropdowns)
 // 5D variant: quick breakout momentum (3-5d hold)
 STRATS_5D.breakout52={
@@ -2921,12 +3025,13 @@ function sgRender(view) {
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Signal Type</div>
       <select class="c" onchange="sgSwitch(this.value)" style="font-size:.76rem;padding:6px 10px;max-width:340px">
-        <option value="movers"   ${view==='movers'   ?'selected':''}>🚀 Big Movers — Day gain >6%</option>
-        <option value="delivery" ${view==='delivery' ?'selected':''}>📦 Delivery Buying — Investment volume >80%</option>
+        <option value="movers"    ${view==='movers'    ?'selected':''}>🚀 Big Movers — Day gain >6%</option>
+        <option value="delivery"  ${view==='delivery'  ?'selected':''}>📦 Delivery Buying — Investment volume >80%</option>
+        <option value="goldcross" ${view==='goldcross' ?'selected':''}>✨ Golden Cross — EMA50 × EMA200 signals</option>
       </select>
     </div>`;
 
-  area.innerHTML = ctrl + (view === 'movers' ? sgMovers() : sgDelivery());
+  area.innerHTML = ctrl + (view === 'movers' ? sgMovers() : view === 'goldcross' ? sgGoldCross() : sgDelivery());
 }
 
 // ── View 1: Big Movers ────────────────────────────────────────────────────────
@@ -3167,6 +3272,175 @@ function sgDelivery() {
     </div>`;
 }
 
+// ── View 3: Golden Cross Signals ─────────────────────────────────────────────
+function sgGoldCross() {
+  const ema = (arr, p) => {
+    const k = 2/(p+1); let e = arr[0];
+    for(let i=1;i<arr.length;i++) e = arr[i]*k + e*(1-k);
+    return e;
+  };
+
+  const scored = AS.map(s => {
+    const dc = s.daily?.c, dv = s.daily?.v;
+    if (!dc || dc.length < 205) return null;
+    const n = dc.length;
+
+    // Build rolling EMA50 + EMA200 for last 15 bars
+    const e50arr=[], e200arr=[];
+    for(let i=n-15; i<=n-1; i++){
+      e50arr.push(ema(dc.slice(Math.max(0,i-60), i+1), 50));
+      e200arr.push(ema(dc.slice(Math.max(0,i-210), i+1), 200));
+    }
+    const len = e50arr.length;
+    const curE50  = e50arr[len-1], curE200 = e200arr[len-1];
+    const prev3E50  = e50arr[len-4]  || e50arr[0];
+    const prev3E200 = e200arr[len-4] || e200arr[0];
+    const prev10E50 = e50arr[len-11] || e50arr[0];
+    const prev10E200= e200arr[len-11]|| e200arr[0];
+
+    // Classify signal type
+    const isFresh      = curE50 > curE200 && prev3E50 <= prev3E200;
+    const isRecent     = curE50 > curE200 && prev10E50 <= prev10E200 && !isFresh;
+    const curGap       = curE50 - curE200;
+    const prev3Gap     = prev3E50 - prev3E200;
+    const isRiding     = curE50 > curE200 && curGap > prev3Gap * 1.05 && !isFresh && !isRecent;
+    const pctGap       = curE200 > 0 ? (curE200 - curE50)/curE200*100 : 99;
+    const isApproaching= curE50 < curE200 && pctGap <= 2.0 && curE50 > prev3E50;
+
+    if (!isFresh && !isRecent && !isRiding && !isApproaching) return null;
+
+    // Quality filters
+    const priceAboveE50  = s.price > curE50;
+    const priceAboveE200 = s.price > curE200;
+    const avgVol = (dv||[]).slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
+    const volOk  = (dv[n-1]||0) >= avgVol * 1.1;
+    const e200_10ago = e200arr[len-11] || e200arr[0];
+    const e200Rising = curE200 > e200_10ago * 0.999;
+
+    // Score: fresh > recent > riding > approaching
+    const typeScore = isFresh ? 4 : isRecent ? 3 : isRiding ? 2 : 1;
+    const qualScore = (priceAboveE50?1:0) + (priceAboveE200?1:0) + (volOk?1:0) + (e200Rising?1:0);
+
+    const signalType = isFresh ? 'Fresh' : isRecent ? 'Recent' : isRiding ? 'Riding' : 'Approaching';
+    const signalColor = isFresh       ? 'var(--green)'
+                      : isRecent      ? '#4ade80'
+                      : isRiding      ? 'var(--accent)'
+                      : 'var(--yellow)';
+    const signalEmoji = isFresh ? '✨' : isRecent ? '🌟' : isRiding ? '📈' : '🔜';
+
+    // Gap % between EMAs
+    const gapPct = curE200 > 0 ? ((curE50-curE200)/curE200*100).toFixed(2) : '0';
+
+    return { ...s, signalType, signalColor, signalEmoji, typeScore, qualScore,
+             curE50: +curE50.toFixed(2), curE200: +curE200.toFixed(2),
+             gapPct, priceAboveE50, priceAboveE200, volOk, e200Rising };
+  })
+  .filter(Boolean)
+  .sort((a,b) => b.typeScore - a.typeScore || b.qualScore - a.qualScore);
+
+  const fresh      = scored.filter(s => s.signalType === 'Fresh');
+  const recent     = scored.filter(s => s.signalType === 'Recent');
+  const riding     = scored.filter(s => s.signalType === 'Riding');
+  const approaching= scored.filter(s => s.signalType === 'Approaching');
+
+  if (!scored.length) return `
+    <div class="sh">✨ Golden Cross — EMA50 × EMA200</div>
+    <div class="ibox" style="color:var(--yellow)">
+      No Golden Cross signals detected in the loaded universe today.<br>
+      This screen lights up after broad market corrections and at the start of new bull legs.
+    </div>`;
+
+  const mcapFmt = v => {
+    const cr = v/1e7;
+    return cr >= 10000 ? `₹${(cr/1000).toFixed(1)}K Cr` : cr > 0 ? `₹${cr.toFixed(0)} Cr` : '';
+  };
+
+  const renderGroup = (title, emoji, color, stocks) => {
+    if (!stocks.length) return '';
+    return `
+      <div class="sh" style="margin-top:14px">${emoji} ${title}
+        <div class="sh-line"></div>
+        <span style="font-size:.63rem;color:var(--muted2)">${stocks.length} stocks</span>
+      </div>
+      <div style="display:grid;gap:10px">
+        ${stocks.map(s => {
+          const rr = s.rrData;
+          return `
+          <div class="cwrap" style="padding:14px;border-left:3px solid ${color}">
+            <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
+              <div style="flex:1;min-width:140px">
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;flex-wrap:wrap">
+                  <span style="font-size:.9rem;font-weight:800;color:var(--text)">${s.symbol}</span>
+                  <span style="font-size:.72rem;font-weight:700;color:${color};background:${color}18;border:1px solid ${color}30;padding:1px 8px;border-radius:10px">
+                    ${s.signalEmoji} ${s.signalType} Cross
+                  </span>
+                  <span style="font-size:.74rem;font-weight:700;color:${s.pctChange>=0?'var(--green)':'var(--red)'}">${s.pctChange>=0?'+':''}${s.pctChange.toFixed(2)}%</span>
+                </div>
+                <div style="font-size:.68rem;color:var(--muted2);margin-bottom:8px">${s.name}</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.67rem;margin-bottom:6px">
+                  <span style="color:var(--text)">₹${s.price.toFixed(1)}</span>
+                  <span style="color:var(--muted2)">EMA50: <strong style="color:var(--accent)">₹${s.curE50}</strong></span>
+                  <span style="color:var(--muted2)">EMA200: <strong style="color:var(--muted2)">₹${s.curE200}</strong></span>
+                  <span style="color:${+s.gapPct>=0?'var(--green)':'var(--red)'}">Gap: ${s.gapPct}%</span>
+                  ${s.mcap > 0 ? `<span style="color:var(--muted2)">${mcapFmt(s.mcap)}</span>` : ''}
+                </div>
+                <!-- Quality checks -->
+                <div style="display:flex;gap:5px;flex-wrap:wrap">
+                  ${[
+                    [s.priceAboveE50,  'Price > EMA50'],
+                    [s.priceAboveE200, 'Price > EMA200'],
+                    [s.volOk,          'Vol confirmed'],
+                    [s.e200Rising,     'EMA200 rising'],
+                    [s.rsi>=45&&s.rsi<=72, `RSI ${s.rsi?s.rsi.toFixed(0):'—'}`],
+                  ].map(([p,l]) => `<span style="font-size:.61rem;padding:2px 7px;border-radius:10px;
+                    background:${p?'rgba(0,212,154,.12)':'rgba(255,69,96,.08)'};
+                    color:${p?'var(--green)':'var(--red)'};
+                    border:1px solid ${p?'rgba(0,212,154,.2)':'rgba(255,69,96,.15)'}">${p?'✓':'✗'} ${l}</span>`).join('')}
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+                <a href="https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}" target="_blank"
+                   style="font-size:.65rem;padding:3px 9px;border-radius:7px;background:rgba(79,142,247,.12);color:#4f8ef7;border:1px solid rgba(79,142,247,.2);text-decoration:none">TV ↗</a>
+                <a href="https://www.screener.in/company/${s.symbol}/" target="_blank"
+                   style="font-size:.65rem;padding:3px 9px;border-radius:7px;background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.2);text-decoration:none">📊 Fund</a>
+              </div>
+            </div>
+            ${rr?.stop ? `
+            <div style="display:flex;gap:8px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:.67rem;flex-wrap:wrap">
+              <span style="color:var(--muted2)">SL: <strong style="color:var(--red)">₹${rr.stop}</strong></span>
+              <span style="color:var(--muted2)">Target: <strong style="color:var(--green)">₹${rr.target}</strong></span>
+              <span style="color:var(--muted2)">R:R: <strong style="color:${rr.passes?'var(--green)':'var(--yellow)'}">1:${rr.rr}</strong></span>
+            </div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+  };
+
+  return `
+    <div class="sh">✨ Golden Cross — EMA50 × EMA200 Daily
+      <div class="sh-line"></div>
+      <span style="font-size:.63rem;color:var(--muted2)">${scored.length} total signals</span>
+    </div>
+    <div class="ibox" style="font-size:.69rem;margin-bottom:4px">
+      <strong>4 signal types:</strong>
+      <span style="color:var(--green)">✨ Fresh</span> = crossed ≤3 bars ago &nbsp;·&nbsp;
+      <span style="color:#4ade80">🌟 Recent</span> = ≤10 bars ago &nbsp;·&nbsp;
+      <span style="color:var(--accent)">📈 Riding</span> = gap widening &nbsp;·&nbsp;
+      <span style="color:var(--yellow)">🔜 Approaching</span> = within 2% of cross
+    </div>
+    <div class="srow" style="margin-bottom:12px">
+      <div class="pill"><strong style="color:var(--green)">${fresh.length}</strong> Fresh ✨</div>
+      <div class="pill"><strong style="color:#4ade80">${recent.length}</strong> Recent 🌟</div>
+      <div class="pill"><strong style="color:var(--accent)">${riding.length}</strong> Riding 📈</div>
+      <div class="pill"><strong style="color:var(--yellow)">${approaching.length}</strong> Approaching 🔜</div>
+    </div>
+    ${renderGroup('Fresh Golden Cross (≤3 bars)', '✨', 'var(--green)', fresh)}
+    ${renderGroup('Recent Golden Cross (≤10 bars)', '🌟', '#4ade80', recent)}
+    ${renderGroup('Riding the Cross (gap widening)', '📈', 'var(--accent)', riding)}
+    ${renderGroup('Approaching Cross (within 2%)', '🔜', 'var(--yellow)', approaching)}
+  `;
+}
+
 // ── Visitor stats polling ─────────────────────────────────────────────────────
 async function pollVisitors() {
   try {
@@ -3298,6 +3572,8 @@ function btCompute(tf, stratKey) {
   };
   // momquality hold is 15 bars (3 weeks) — optimal for momentum continuation
   if(stratKey==='momquality') TF_CFG.alpha={ ...TF_CFG.alpha, hold:15, label:'Momentum Quality', period:'last 9 months' };
+  if(stratKey==='goldcross')  TF_CFG.alpha={ ...TF_CFG.alpha, hold:40, label:'Golden Cross', period:'last 9 months' };
+  if(stratKey==='goldcross')  TF_CFG.pos  ={ ...TF_CFG.pos,   hold:40, label:'Golden Cross', period:'last 10 months' };
   const cfg   = TF_CFG[tf] || TF_CFG['5d'];
   const strat = getStrats(tf)[stratKey];
   const results = [];

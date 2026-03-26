@@ -75,17 +75,24 @@ header h1 span.hl{color:var(--accent);}
 
 /* ── NAV TABS ── */
 .nav{
-  display:flex;gap:2px;padding:8px 16px 0;
+  display:grid;
+  grid-template-columns:repeat(5, 1fr);
+  gap:2px;padding:8px 12px 0;
   background:rgba(7,11,18,.85);backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--border);overflow-x:auto;
-  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  border-bottom:1px solid var(--border);
 }
-.nav::-webkit-scrollbar{display:none;}
+.nav-row2{
+  display:grid;
+  grid-template-columns:repeat(5, 1fr);
+  gap:2px;padding:2px 12px 0;
+  background:rgba(7,11,18,.85);
+  border-bottom:1px solid var(--border);
+}
 .ntab{
-  padding:7px 13px;border-radius:8px 8px 0 0;cursor:pointer;
-  font-size:.72rem;font-weight:600;color:var(--muted2);
+  padding:6px 8px;border-radius:8px 8px 0 0;cursor:pointer;
+  font-size:.67rem;font-weight:600;color:var(--muted2);
   border:1px solid transparent;border-bottom:none;white-space:nowrap;
-  transition:all .15s;
+  transition:all .15s;text-align:center;overflow:hidden;text-overflow:ellipsis;
 }
 .ntab:hover{color:var(--text);background:rgba(255,255,255,.04);}
 .ntab.active{
@@ -570,13 +577,20 @@ input,select,textarea{font-size:16px!important;}
   <div class="ntab" id="t-oi" onclick="gt('oi')">📈 OI</div>
   <div class="ntab" id="t-fi" onclick="gt('fi')">🌍 FII/DII</div>
   <div class="ntab" id="t-ro" onclick="gt('ro')">🔁 Rotation</div>
+</div>
+<div class="nav-row2">
   <div class="ntab" id="t-ca" onclick="gt('ca')">📅 Calendar</div>
   <div class="ntab" id="t-nw" onclick="gt('nw')">📰 News</div>
   <div class="ntab" id="t-bt" onclick="gt('bt')">🔁 Backtest</div>
-  <div class="ntab" id="t-ps" onclick="gt('ps')">🧮 Sizer</div>
-  <div class="ntab" id="t-jn" onclick="gt('jn')">📓 Journal</div>
   <div class="ntab" id="t-sg" onclick="gt('sg')">📡 Signals</div>
   <div class="ntab" id="t-ai" onclick="gt('ai')">🤖 AI Analyze</div>
+</div>
+<div class="nav-row2">
+  <div class="ntab" id="t-ps" onclick="gt('ps')">🧮 Sizer</div>
+  <div class="ntab" id="t-jn" onclick="gt('jn')">📓 Journal</div>
+  <div class="ntab" style="visibility:hidden"></div>
+  <div class="ntab" style="visibility:hidden"></div>
+  <div class="ntab" style="visibility:hidden"></div>
 </div>
 
 <!-- Strategy Panel: Timeframe tabs + Strategy cards -->
@@ -3467,15 +3481,56 @@ function sgGoldCross() {
 // ── AI ANALYZE TAB ──────────────────────────────────────────────────────────
 let AI_STATE = { loading: false, result: null };
 
+// ── AI tab state ─────────────────────────────────────────────────────────────
+let AI_API_OK = null; // null=unknown, true=ready, false=not configured
+
+async function checkAIStatus() {
+  try {
+    const r = await fetch(`${PROXY_BASE}/api/health`, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return;
+    const d = await r.json();
+    AI_API_OK = d.claude_ready === true;
+    // Update badge if visible
+    const badge = document.getElementById('ai-status-badge');
+    if (badge) renderAIBadge(badge);
+  } catch(e) {}
+}
+
+function renderAIBadge(el) {
+  if (AI_API_OK === null) {
+    el.innerHTML = '<span style="color:var(--yellow)">⏳ Checking API status…</span>';
+  } else if (AI_API_OK) {
+    el.innerHTML = '<span style="color:var(--green)">✅ Claude API connected — ready to analyze</span>';
+  } else {
+    el.innerHTML = `<span style="color:var(--red)">❌ ANTHROPIC_API_KEY not set on Render.</span>
+      <a href="https://render.com" target="_blank" style="color:#4f8ef7;font-size:.63rem;margin-left:6px">Fix on Render →</a>`;
+  }
+}
+
 function rAI() {
   const area = document.getElementById('area');
+
+  // Build AI suggestions from loaded stocks (top momentum + breakout candidates)
+  const suggestions = aiGetSuggestions();
+
   area.innerHTML = `
     <div class="sh">🤖 AI Strategy Analyzer
       <div class="sh-line"></div>
       <span style="font-size:.63rem;color:var(--muted2)">Powered by Claude</span>
     </div>
 
-    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-bottom:16px">
+    <!-- API Status Banner -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:10px;
+                padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:.72rem;color:var(--muted2);font-weight:700;flex-shrink:0">API Status:</span>
+      <span id="ai-status-badge" style="font-size:.72rem;flex:1"></span>
+      <button onclick="checkAIStatus().then(()=>{const b=document.getElementById('ai-status-badge');if(b)renderAIBadge(b);})"
+        style="font-size:.62rem;background:var(--card2);border:1px solid var(--border2);color:var(--muted2);
+               padding:3px 8px;border-radius:6px;cursor:pointer">↻ Refresh</button>
+    </div>
+
+    <!-- Analyze Panel -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-bottom:14px">
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
         <div style="flex:1;min-width:140px">
           <label style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Symbol (NSE)</label>
@@ -3501,12 +3556,126 @@ function rAI() {
       </div>
       <div style="font-size:.65rem;color:var(--muted2);margin-top:10px;line-height:1.6">
         Claude analyzes OHLCV price action → generates a custom strategy → backtests it → writes Pine Script for TradingView.
-        <strong style="color:var(--yellow)">Requires ANTHROPIC_API_KEY set on Render.</strong>
       </div>
     </div>
 
+    <!-- AI Stock Suggestions -->
+    ${suggestions.length ? `
+    <div style="margin-bottom:14px">
+      <div class="sh" style="margin-bottom:8px">🎯 AI Suggested Stocks to Analyze
+        <div class="sh-line"></div>
+        <span style="font-size:.63rem;color:var(--muted2)">Ranked by setup quality · tap to auto-fill</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">
+        ${suggestions.map(s => `
+          <div onclick="aiPickStock('${s.symbol}','${s.tf}')"
+            style="background:var(--card);border:1px solid ${s.color}30;border-left:3px solid ${s.color};
+                   border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s"
+            onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background='var(--card)'">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:.8rem;font-weight:800;color:var(--text)">${s.symbol}</span>
+              <span style="font-size:.6rem;background:${s.color}18;color:${s.color};
+                           border:1px solid ${s.color}30;padding:1px 6px;border-radius:6px">${s.badge}</span>
+            </div>
+            <div style="font-size:.62rem;color:var(--muted2);margin-bottom:5px">${s.reason}</div>
+            <div style="display:flex;justify-content:space-between;font-size:.63rem">
+              <span style="color:${s.pctChange>=0?'var(--green)':'var(--red)'}">
+                ${s.pctChange>=0?'+':''}${s.pctChange.toFixed(1)}%
+              </span>
+              <span style="color:var(--muted2)">RSI ${s.rsi ? s.rsi.toFixed(0) : '?'}</span>
+              <span style="color:#4f8ef7;font-weight:600">${s.tf}</span>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>` : `
+    <div class="ibox" style="margin-bottom:14px;font-size:.7rem">
+      💡 Load stock data first (⚡ Load button) to see AI stock suggestions.
+    </div>`}
+
     <div id="ai-result">${AI_STATE.result ? aiRenderResult(AI_STATE.result) : aiRenderEmpty()}</div>
   `;
+
+  // Render status badge + check API
+  const badge = document.getElementById('ai-status-badge');
+  if (badge) renderAIBadge(badge);
+  if (AI_API_OK === null) checkAIStatus();
+}
+
+function aiGetSuggestions() {
+  if (!AS || !AS.length) return [];
+
+  // Score each stock for AI analysis worthiness
+  // We want setups that are interesting enough for Claude to find a real strategy
+  const scored = AS
+    .filter(s => s.daily?.c?.length >= 100 && s.price > 50)
+    .map(s => {
+      const dc = s.daily?.c || [];
+      const n = dc.length;
+      let score = 0;
+      let reasons = [];
+      let badge = '';
+      let color = '#4f8ef7';
+      let tf = 'daily';
+
+      // 52W breakout setup
+      const prior52High = n >= 252 ? Math.max(...dc.slice(-252,-1)) : Math.max(...dc.slice(0,-1));
+      if (s.price >= prior52High * 0.99) {
+        score += 30; reasons.push('at 52W high'); badge = '🔥 Breakout'; color = '#ff6b35';
+      }
+      // Momentum: 6M return > 15%
+      const ret6m = n >= 130 ? ((dc[n-1]-dc[n-127])/dc[n-127]*100) : 0;
+      if (ret6m >= 15) { score += 20; reasons.push(`+${ret6m.toFixed(0)}% in 6M`); }
+      // EMA alignment
+      if (s.e20 && s.e50 && s.e20 > s.e50) { score += 15; }
+      if (!badge && s.e20 && s.e50 && s.e20 > s.e50 && score >= 30) {
+        badge = '📈 Momentum'; color = '#c084fc';
+      }
+      // RSI healthy zone
+      if (s.rsi && s.rsi >= 52 && s.rsi <= 72) { score += 10; }
+      // Volume surge
+      if (s.volRatio >= 1.5) { score += 15; reasons.push(`${s.volRatio.toFixed(1)}x vol`); }
+      // Golden cross approaching
+      if (!badge && s.e20 && s.e50) {
+        const ema50 = s.e50, ema200 = s.e20; // using available EMAs
+        if (s.pct52 >= 40 && s.pct52 <= 70) {
+          score += 10; badge = '✨ Golden Cross'; color = '#fbbf24';
+        }
+      }
+      // Mean reversion: oversold but above EMA200 support
+      if (!badge && s.rsi && s.rsi < 40 && s.rsi > 28 && s.pct52 > 30) {
+        score += 25; badge = '🔄 Reversion'; color = '#00d49a';
+        reasons.push('RSI oversold bounce');
+      }
+      if (!badge) { badge = '📊 Setup'; color = '#4f8ef7'; }
+      if (!reasons.length) reasons.push('technical setup detected');
+
+      return {
+        symbol: s.symbol,
+        score,
+        badge,
+        color,
+        reason: reasons.slice(0,2).join(' · '),
+        pctChange: s.pctChange,
+        rsi: s.rsi,
+        tf,
+      };
+    })
+    .filter(s => s.score >= 30)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);  // top 12 suggestions
+
+  return scored;
+}
+
+function aiPickStock(sym, tf) {
+  // Auto-fill symbol and timeframe, scroll to input
+  const symEl = document.getElementById('ai-sym');
+  const tfEl  = document.getElementById('ai-tf');
+  if (symEl) symEl.value = sym;
+  if (tfEl && tf) tfEl.value = tf;
+  symEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  symEl?.focus();
+  toast(`${sym} selected — click Analyze to run`, 'i');
 }
 
 function aiRenderEmpty() {

@@ -13,7 +13,7 @@ CORS(app)
 
 CACHE_TTL   = 300
 FII_TTL     = 1800
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 _stock_cache: dict = {}
 _fii_cache   = {"ts": 0, "data": None}
@@ -84,30 +84,42 @@ def get_live_price(symbol: str) -> float | None:
 
 # ── AI Strategy Engine ─────────────────────────────────────────────────────────
 
-def _claude(system: str, user: str, max_tokens: int = 2000) -> str:
-    """Call Claude claude-sonnet-4-20250514 and return text response."""
-    if not ANTHROPIC_API_KEY:
+def _gemini(system: str, user: str, max_tokens: int = 2000) -> str:
+    """Call Google Gemini 1.5 Flash (free forever) and return text response."""
+    if not GEMINI_API_KEY:
         return ""
+    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}")
+    # Gemini combines system + user into one prompt for best results
+    combined = f"{system}\n\n---\n\n{user}"
+    payload = {
+        "contents": [{"parts": [{"text": combined}]}],
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "temperature": 0.2,      # low temp for consistent JSON output
+            "topP": 0.8,
+        },
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT",        "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH",       "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ],
+    }
     try:
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": max_tokens,
-                "system": system,
-                "messages": [{"role": "user", "content": user}],
-            },
-            timeout=60,
-        )
+        r = requests.post(url, json=payload, timeout=60)
         if r.ok:
-            return r.json()["content"][0]["text"]
+            data = r.json()
+            # Extract text from Gemini response structure
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    return parts[0].get("text", "")
+        else:
+            print(f"[Gemini] HTTP {r.status_code}: {r.text[:200]}")
     except Exception as e:
-        print(f"[Claude] Error: {e}")
+        print(f"[Gemini] Error: {e}")
     return ""
 
 
@@ -256,9 +268,9 @@ Design a strategy that:
 
 Return only the JSON strategy object."""
 
-    raw = _claude(system, user, max_tokens=1500)
+    raw = _gemini(system, user, max_tokens=1500)
     if not raw:
-        return {"viable": False, "error": "Claude API unavailable"}
+        return {"viable": False, "error": "Gemini API unavailable — check GEMINI_API_KEY on Render"}
     # Strip markdown fences if present
     raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`").strip()
     try:
@@ -524,9 +536,9 @@ Requirements:
   {{\"symbol\": \"{symbol}\", \"action\": \"{{action}}\", \"price\": \"{{close}}\", \"timeframe\": \"{timeframe}\"}}
 - Add a small info table in top-right corner showing strategy name and timeframe"""
 
-    code = _claude(system, user, max_tokens=3000)
+    code = _gemini(system, user, max_tokens=3000)
     if not code:
-        return "// Pine Script generation failed — ANTHROPIC_API_KEY not set"
+        return "// Pine Script generation failed — GEMINI_API_KEY not set on Render"
     # Clean up markdown fences
     code = re.sub(r"```(?:pine)?script?", "", code, flags=re.IGNORECASE).strip().rstrip("`").strip()
     return code
@@ -563,7 +575,8 @@ def health():
         "wa_alerts": wa_alerts,
         "tv_signals": tv_count,
         "market_open": is_market_open(),
-        "claude_ready": bool(ANTHROPIC_API_KEY),
+        "ai_ready": bool(GEMINI_API_KEY),
+        "ai_provider": "Gemini 1.5 Flash (free)" if GEMINI_API_KEY else "not configured",
     })
 
 
@@ -578,8 +591,8 @@ def analyze():
 
     if not symbol:
         return jsonify({"error": "symbol required"}), 400
-    if not ANTHROPIC_API_KEY:
-        return jsonify({"error": "ANTHROPIC_API_KEY not configured on server"}), 503
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "GEMINI_API_KEY not configured on Render — get free key at aistudio.google.com"}), 503
 
     # Clean symbol — add .NS if not present
     sym_yf = symbol + ".NS" if not symbol.endswith(".NS") else symbol

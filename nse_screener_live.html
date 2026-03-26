@@ -77,22 +77,23 @@ header h1 span.hl{color:var(--accent);}
 .nav{
   display:grid;
   grid-template-columns:repeat(5, 1fr);
-  gap:2px;padding:8px 12px 0;
+  gap:1px;padding:8px 8px 0;
   background:rgba(7,11,18,.85);backdrop-filter:blur(12px);
   border-bottom:1px solid var(--border);
 }
 .nav-row2{
   display:grid;
   grid-template-columns:repeat(5, 1fr);
-  gap:2px;padding:2px 12px 0;
+  gap:1px;padding:2px 8px 0;
   background:rgba(7,11,18,.85);
   border-bottom:1px solid var(--border);
 }
 .ntab{
-  padding:6px 8px;border-radius:8px 8px 0 0;cursor:pointer;
-  font-size:.67rem;font-weight:600;color:var(--muted2);
+  padding:6px 4px;border-radius:8px 8px 0 0;cursor:pointer;
+  font-size:.6rem;font-weight:600;color:var(--muted2);
   border:1px solid transparent;border-bottom:none;white-space:nowrap;
-  transition:all .15s;text-align:center;overflow:hidden;text-overflow:ellipsis;
+  transition:all .15s;text-align:center;
+  overflow:visible;text-overflow:clip;
 }
 .ntab:hover{color:var(--text);background:rgba(255,255,255,.04);}
 .ntab.active{
@@ -581,7 +582,7 @@ input,select,textarea{font-size:16px!important;}
 <div class="nav-row2">
   <div class="ntab" id="t-ca" onclick="gt('ca')">📅 Calendar</div>
   <div class="ntab" id="t-nw" onclick="gt('nw')">📰 News</div>
-  <div class="ntab" id="t-bt" onclick="gt('bt')">🔁 Backtest</div>
+  <div class="ntab" id="t-bt" onclick="gt('bt')">📈 Backtest</div>
   <div class="ntab" id="t-sg" onclick="gt('sg')">📡 Signals</div>
   <div class="ntab" id="t-ai" onclick="gt('ai')">🤖 AI Analyze</div>
 </div>
@@ -596,21 +597,13 @@ input,select,textarea{font-size:16px!important;}
 <!-- Strategy Panel: Timeframe tabs + Strategy cards -->
 <div class="tf-panel" id="tf-panel">
   <div class="tf-row">
-    <div class="tf-tab active" id="tf-5d" onclick="setTF('5d')" style="--tf-color:#ff4560">
-      <span class="tf-icon">⚡</span>
-      <span class="tf-label"><span class="tf-name">5-Day</span><span class="tf-sub">Momentum</span></span>
-    </div>
-    <div class="tf-tab" id="tf-2w" onclick="setTF('2w')" style="--tf-color:#4f8ef7">
+    <div class="tf-tab active" id="tf-2w" onclick="setTF('2w')" style="--tf-color:#4f8ef7">
       <span class="tf-icon">📅</span>
       <span class="tf-label"><span class="tf-name">2–4 Week</span><span class="tf-sub">Swing</span></span>
     </div>
     <div class="tf-tab" id="tf-pos" onclick="setTF('pos')" style="--tf-color:#00d49a">
       <span class="tf-icon">🏦</span>
       <span class="tf-label"><span class="tf-name">Positional</span><span class="tf-sub">4–16 Weeks</span></span>
-    </div>
-    <div class="tf-tab" id="tf-inv" onclick="setTF('inv')" style="--tf-color:#a78bfa">
-      <span class="tf-icon">💎</span>
-      <span class="tf-label"><span class="tf-name">Investment</span><span class="tf-sub">Long Term</span></span>
     </div>
     <div class="tf-tab" id="tf-alpha" onclick="setTF('alpha')" style="--tf-color:#ff6b35">
       <span class="tf-icon">🔥</span>
@@ -2052,14 +2045,14 @@ STRATS_POS.breakout52={
 };
 
 
-let ACTIVE_TF='5d', ACTIVE_SUBSTRAT='rubber';
+let ACTIVE_TF='2w', ACTIVE_SUBSTRAT='vcp';
 let BT_TF=null, BT_STRAT=null, BT_RESULTS=[];  // backtest local state
 
 function getStrats(tf){
   if(tf==='2w') return STRATS_2W;
   if(tf==='pos') return STRATS_POS;
   if(tf==='alpha') return STRATS_ALPHA;
-  return STRATS_5D;
+  return STRATS_2W;  // default fallback (5d removed)
 }
 
 // hex color → rgb tuple string for CSS var
@@ -2071,24 +2064,11 @@ function hexToRGB(hex){
 
 function setTF(tf){
   ACTIVE_TF=tf;
-  // Update tab active states
-  ['5d','2w','pos','inv','alpha'].forEach(t=>{
+  // Update tab active states (only 2w, pos, alpha remain)
+  ['2w','pos','alpha'].forEach(t=>{
     const el=document.getElementById('tf-'+t);
     if(el) el.classList.toggle('active', t===tf);
   });
-
-  // Investment tab — show dedicated view in area, hide screener
-  if(tf==='inv'){
-    document.getElementById('cbar').style.display='none';
-    document.getElementById('strat-row').innerHTML='';
-    // Switch to area view
-    const tabs=document.querySelectorAll('.ntab');
-    tabs.forEach(t=>t.classList.remove('active'));
-    document.getElementById('t-sc').classList.add('active');
-    gt('sc'); // ensure area is visible
-    rInv();
-    return;
-  }
 
   const strats=getStrats(tf);
   const keys=Object.keys(strats);
@@ -3489,7 +3469,7 @@ async function checkAIStatus() {
     const r = await fetch(`${PROXY_BASE}/api/health`, { signal: AbortSignal.timeout(6000) });
     if (!r.ok) return;
     const d = await r.json();
-    AI_API_OK = d.claude_ready === true;
+    AI_API_OK = d.ai_ready === true;
     // Update badge if visible
     const badge = document.getElementById('ai-status-badge');
     if (badge) renderAIBadge(badge);
@@ -3500,10 +3480,10 @@ function renderAIBadge(el) {
   if (AI_API_OK === null) {
     el.innerHTML = '<span style="color:var(--yellow)">⏳ Checking API status…</span>';
   } else if (AI_API_OK) {
-    el.innerHTML = '<span style="color:var(--green)">✅ Claude API connected — ready to analyze</span>';
+    el.innerHTML = '<span style="color:var(--green)">✅ Gemini API connected — free forever (1.5 Flash)</span>';
   } else {
-    el.innerHTML = `<span style="color:var(--red)">❌ ANTHROPIC_API_KEY not set on Render.</span>
-      <a href="https://render.com" target="_blank" style="color:#4f8ef7;font-size:.63rem;margin-left:6px">Fix on Render →</a>`;
+    el.innerHTML = `<span style="color:var(--red)">❌ GEMINI_API_KEY not set on Render.</span>
+      <a href="https://render.com" target="_blank" style="color:#4f8ef7;font-size:.63rem;margin-left:6px">Fix on Render →</a>  <a href="https://aistudio.google.com" target="_blank" style="color:#4f8ef7;font-size:.63rem;margin-left:4px">Get free Gemini key →</a>`;
   }
 }
 
@@ -3762,7 +3742,7 @@ async function aiAnalyze() {
     document.getElementById('ai-result').innerHTML = `
       <div class="ibox" style="color:var(--red)">
         ❌ Analysis failed: ${e.message || 'Network error'}.<br>
-        Make sure ANTHROPIC_API_KEY is set on Render, then redeploy.
+        Make sure GEMINI_API_KEY is set on Render (free key from aistudio.google.com), then redeploy.
       </div>`;
   } finally {
     AI_STATE.loading = false;
@@ -4073,7 +4053,7 @@ function rBT() {
   }
   // Init BT state from active screener on first call
   if (!BT_TF) {
-    BT_TF = (ACTIVE_TF === 'inv' ? '2w' : ACTIVE_TF) || '5d';
+    BT_TF = (ACTIVE_TF === '2w' || ACTIVE_TF === 'pos' || ACTIVE_TF === 'alpha') ? ACTIVE_TF : '2w';
     const strats = getStrats(BT_TF);
     BT_STRAT = (ACTIVE_SUBSTRAT in strats) ? ACTIVE_SUBSTRAT : Object.keys(strats)[0];
   }
@@ -4129,7 +4109,7 @@ function btRender(searchQ) {
 
   // TF options
   const tfOptions = [
-    ['5d','⚡ 5-Day'],['2w','📅 2–4 Week'],['pos','🏦 Positional'],['alpha','🔥 Alpha 52W']
+    ['2w','📅 2–4 Week'],['pos','🏦 Positional'],['alpha','🔥 Alpha 52W']
   ].map(([v,l]) => `<option value="${v}" ${v===tf?'selected':''}>${l}</option>`).join('');
 
   // Control bar (always visible)
@@ -4359,7 +4339,7 @@ function btDisplayResults(searchQ) {
   const tf       = BT_TF   || '5d';
   const stratKey = BT_STRAT || 'rubber';
   const strat    = getStrats(tf)[stratKey];
-  const TF_LABELS = { '5d':'last 4 weeks', '2w':'last 15 weeks', 'pos':'6 months back', 'alpha':'last 9 months' };
+  const TF_LABELS = { '2w':'last 15 weeks', 'pos':'6 months back', 'alpha':'last 9 months' };
   const stratLabel = stratKey==='momquality' ? 'Momentum Quality' : (strat?.name||stratKey);
 
   let filtered = BT_RESULTS;
@@ -4554,7 +4534,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('wlc').textContent=WL.length;
   document.getElementById('alc').textContent=ALT.filter(a=>!a.triggered).length;
   // Initialize strategy panel — default to 5-Day
-  setTF('5d');
+  setTF('2w');
   mktStatusBadge();
   // Auto-load data on page open
   setTimeout(loadData, 400);

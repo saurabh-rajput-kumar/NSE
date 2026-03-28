@@ -208,17 +208,50 @@ def _compute_indicators(bars: list) -> dict:
     
     # Risk per unit
     risk = price_now - stop
-    
-    # Target: nearest pivot high above price, or 2.5× risk
-    pivot_highs = [highs[i] for i in range(max(0,n-50), n-1)
-                   if highs[i] > price_now * 1.005
-                   and highs[i] == max(highs[max(0,i-3):i+4])]
-    pivot_highs = sorted(pivot_highs)
-    target_pivot = pivot_highs[0] if pivot_highs else None
-    target_2x    = round(price_now + risk * 2.5, 2)
-    target = round(target_pivot, 2) if (target_pivot and target_pivot < price_now + risk * 4) else target_2x
-    
+    min_target = price_now + risk * 2.0   # enforce minimum 1:2 R:R
+
+    # Target: scan ALL available bars for pivot highs above price
+    # Only accept pivots that give at least 1:2 R:R
+    pivot_highs_all = []
+    scan_start = max(0, n - 252)   # scan up to 1 year back
+    for i in range(scan_start, n - 1):
+        ph = highs[i]
+        window = 5
+        lo = max(0, i - window)
+        hi = min(n - 1, i + window + 1)
+        if ph == max(highs[lo:hi]) and ph >= min_target:
+            pivot_highs_all.append(ph)
+
+    # Sort ascending — pick the nearest one that still gives ≥1:2
+    pivot_highs_all = sorted(set(pivot_highs_all))
+    target_pivot = pivot_highs_all[0] if pivot_highs_all else None
+
+    # Fallback projections (if no good pivot found)
+    target_2_5x = round(price_now + risk * 2.5, 2)   # 1:2.5 risk multiple
+    target_3x   = round(price_now + risk * 3.0, 2)   # 1:3   risk multiple
+
+    # 52W high as natural ceiling target (if above min_target)
+    hi52 = max(closes[-252:]) if n >= 252 else max(closes)
+    target_52w = round(hi52, 2) if hi52 >= min_target else None
+
+    # Pick best target:
+    # 1. Nearest pivot at ≥1:2 R:R
+    # 2. 52W high if it gives ≥1:2 and is reasonable (within 15% of price)
+    # 3. 2.5× risk projection
+    if target_pivot:
+        target = round(target_pivot, 2)
+    elif target_52w and target_52w <= price_now * 1.15:
+        target = target_52w
+    else:
+        target = target_2_5x
+
     rr = round((target - price_now) / risk, 2) if risk > 0 else 0
+
+    # Safety check: if R:R still < 1:2 (shouldn't happen but guard it),
+    # force 2.5× risk projection
+    if rr < 2.0:
+        target = target_2_5x
+        rr = round((target - price_now) / risk, 2) if risk > 0 else 0
     
     return {
         "ema9":   ema(closes[-15:],   9),

@@ -76,18 +76,19 @@ header h1 span.hl{color:var(--accent);}
 /* ── NAV TABS ── */
 .nav{
   display:grid;
-  grid-template-columns:repeat(5, 1fr);
+  grid-template-columns:repeat(4, 1fr);
   gap:1px;padding:8px 8px 0;
   background:rgba(7,11,18,.85);backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--border);
+  border-bottom:none;
 }
 .nav-row2{
-  display:grid;
-  grid-template-columns:repeat(5, 1fr);
+  display:flex;flex-wrap:nowrap;overflow-x:auto;
   gap:1px;padding:2px 8px 0;
   background:rgba(7,11,18,.85);
   border-bottom:1px solid var(--border);
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
 }
+.nav-row2::-webkit-scrollbar{display:none;}
 .ntab{
   padding:6px 4px;border-radius:8px 8px 0 0;cursor:pointer;
   font-size:.6rem;font-weight:600;color:var(--muted2);
@@ -574,24 +575,19 @@ input,select,textarea{font-size:16px!important;}
 
 <div class="nav">
   <div class="ntab active" id="t-sc" onclick="gt('sc')">📋 Screener</div>
+  <div class="ntab" id="t-sg" onclick="gt('sg')">📡 Signals</div>
+  <div class="ntab" id="t-ai" onclick="gt('ai')">🤖 AI Analyze</div>
+  <div class="ntab" id="t-bt" onclick="gt('bt')">📈 Backtest</div>
+</div>
+<div class="nav-row2">
   <div class="ntab" id="t-mt" onclick="gt('mt')">📊 MTF RSI</div>
   <div class="ntab" id="t-oi" onclick="gt('oi')">📈 OI</div>
   <div class="ntab" id="t-fi" onclick="gt('fi')">🌍 FII/DII</div>
   <div class="ntab" id="t-ro" onclick="gt('ro')">🔁 Rotation</div>
-</div>
-<div class="nav-row2">
   <div class="ntab" id="t-ca" onclick="gt('ca')">📅 Calendar</div>
   <div class="ntab" id="t-nw" onclick="gt('nw')">📰 News</div>
-  <div class="ntab" id="t-bt" onclick="gt('bt')">📈 Backtest</div>
-  <div class="ntab" id="t-sg" onclick="gt('sg')">📡 Signals</div>
-  <div class="ntab" id="t-ai" onclick="gt('ai')">🤖 AI Analyze</div>
-</div>
-<div class="nav-row2">
   <div class="ntab" id="t-ps" onclick="gt('ps')">🧮 Sizer</div>
   <div class="ntab" id="t-jn" onclick="gt('jn')">📓 Journal</div>
-  <div class="ntab" style="visibility:hidden"></div>
-  <div class="ntab" style="visibility:hidden"></div>
-  <div class="ntab" style="visibility:hidden"></div>
 </div>
 
 <!-- Strategy Panel: Timeframe tabs + Strategy cards -->
@@ -3802,6 +3798,43 @@ function aiRenderResult(data) {
       </div>
       ${s.rationale ? `<div style="font-size:.68rem;color:var(--muted2);margin-top:10px;padding-top:10px;border-top:1px solid ${typeColor}20;line-height:1.6">${s.rationale}</div>` : ''}
     </div>
+
+    <!-- Trade Plan — Entry / SL / Target -->
+    ${data.indicators?.trade_entry ? `
+    <div style="background:linear-gradient(135deg,rgba(0,212,154,.1),rgba(79,142,247,.08));
+                border:1px solid rgba(0,212,154,.25);border-radius:14px;padding:14px 16px;margin-bottom:14px">
+      <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;
+                  letter-spacing:.5px;margin-bottom:12px">🎯 Next Trade Setup — ${data.symbol} ${data.timeframe}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+        <div style="background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.25);
+                    border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:.6rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Entry</div>
+          <div style="font-size:1rem;font-weight:800;color:#4f8ef7">₹${data.indicators.trade_entry}</div>
+          <div style="font-size:.6rem;color:var(--muted2);margin-top:2px">Current close</div>
+        </div>
+        <div style="background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.25);
+                    border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:.6rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Stop Loss</div>
+          <div style="font-size:1rem;font-weight:800;color:var(--red)">₹${data.indicators.trade_sl}</div>
+          <div style="font-size:.6rem;color:var(--muted2);margin-top:2px">−${data.indicators.trade_sl_dist_pct}% · swing low</div>
+        </div>
+        <div style="background:rgba(0,212,154,.1);border:1px solid rgba(0,212,154,.25);
+                    border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:.6rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Target</div>
+          <div style="font-size:1rem;font-weight:800;color:var(--green)">₹${data.indicators.trade_target}</div>
+          <div style="font-size:.6rem;color:var(--muted2);margin-top:2px">R:R 1:${data.indicators.trade_rr}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;font-size:.67rem;flex-wrap:wrap;padding-top:8px;
+                  border-top:1px solid rgba(0,212,154,.15)">
+        <span style="color:var(--muted2)">Risk/unit: <strong style="color:var(--text)">₹${(data.indicators.trade_entry - data.indicators.trade_sl).toFixed(2)}</strong></span>
+        <span style="color:var(--muted2)">Reward/unit: <strong style="color:var(--green)">₹${(data.indicators.trade_target - data.indicators.trade_entry).toFixed(2)}</strong></span>
+        <span style="color:var(--muted2)">ATR: <strong style="color:var(--text)">₹${data.indicators.atr14}</strong></span>
+        <span style="color:var(--muted2);font-style:italic;font-size:.62rem;margin-left:auto">
+          Based on swing low SL + pivot resistance target · confirm with entry signal before trading
+        </span>
+      </div>
+    </div>` : ''}
 
     <!-- Strategy Rules -->
     <div class="cwrap" style="padding:14px;margin-bottom:12px">

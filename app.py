@@ -191,6 +191,35 @@ def _compute_indicators(bars: list) -> dict:
 
     avg_vol = sum(volumes[-21:-1])/20 if n >= 21 else sum(volumes)/max(len(volumes),1)
 
+    price_now = closes[-1]
+    
+    # ── Compute trade levels from price action ────────────────────────────────
+    # Entry: current close (or next open — use close as proxy)
+    entry = round(price_now, 2)
+    
+    # Stop loss: swing low of last 10 bars, or 1.5×ATR fallback
+    swing_lo = min(lows[-10:]) if len(lows) >= 10 else price_now - atr * 1.5
+    sl_swing  = round(swing_lo - atr * 0.3, 2)   # slightly below swing low
+    sl_atr    = round(price_now - atr * 1.5, 2)
+    # Use swing low if it gives a meaningful stop (1–7% below price)
+    sl_dist_swing = (price_now - sl_swing) / price_now * 100
+    stop = sl_swing if 1.0 <= sl_dist_swing <= 7.0 else sl_atr
+    stop = round(stop, 2)
+    
+    # Risk per unit
+    risk = price_now - stop
+    
+    # Target: nearest pivot high above price, or 2.5× risk
+    pivot_highs = [highs[i] for i in range(max(0,n-50), n-1)
+                   if highs[i] > price_now * 1.005
+                   and highs[i] == max(highs[max(0,i-3):i+4])]
+    pivot_highs = sorted(pivot_highs)
+    target_pivot = pivot_highs[0] if pivot_highs else None
+    target_2x    = round(price_now + risk * 2.5, 2)
+    target = round(target_pivot, 2) if (target_pivot and target_pivot < price_now + risk * 4) else target_2x
+    
+    rr = round((target - price_now) / risk, 2) if risk > 0 else 0
+    
     return {
         "ema9":   ema(closes[-15:],   9),
         "ema20":  ema(closes[-25:],  20),
@@ -202,7 +231,13 @@ def _compute_indicators(bars: list) -> dict:
         "vol_ratio":  round(volumes[-1]/avg_vol, 2) if avg_vol else 1.0,
         "hi52":   max(closes[-252:]) if n >= 252 else max(closes),
         "lo52":   min(closes[-252:]) if n >= 252 else min(closes),
-        "price":  closes[-1],
+        "price":  price_now,
+        # Trade levels — computed from price action
+        "trade_entry":  entry,
+        "trade_sl":     stop,
+        "trade_target": target,
+        "trade_rr":     rr,
+        "trade_sl_dist_pct": round((price_now - stop) / price_now * 100, 2),
     }
 
 
@@ -604,9 +639,12 @@ if entryLong and strategy.position_size == 0
     slLevel  := close - {sl_r} * atr14
     tgtLevel := close + {tgt_r} * (close - slLevel)
     strategy.entry("Long", strategy.long)
+    strategy.exit("Exit", "Long", stop=slLevel, limit=tgtLevel)
     alert('{{"symbol":"{symbol}","action":"BUY","price":"' + str.tostring(math.round(close, 2)) + '","timeframe":"{timeframe}"}}', alert.freq_once_per_bar_close)
 
-strategy.exit("Exit", "Long", stop=slLevel, limit=tgtLevel)
+// Keep exit order active while in position (re-submit each bar with same levels)
+if strategy.position_size > 0 and not entryLong
+    strategy.exit("Exit", "Long", stop=slLevel, limit=tgtLevel)
 
 if strategy.position_size[1] > 0 and strategy.position_size == 0
     alert('{{"symbol":"{symbol}","action":"SELL","price":"' + str.tostring(math.round(close, 2)) + '","timeframe":"{timeframe}"}}', alert.freq_once_per_bar_close)

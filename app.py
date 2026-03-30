@@ -614,7 +614,20 @@ def _run_backtest(bars: list, strategy: dict, indicators: dict) -> dict:
 
 
 def _gen_pine_script(symbol: str, strategy: dict, timeframe: str) -> str:
-    """Generate Pine Script v6. Gemini first, working v6 fallback template second."""
+    """Generate Pine Script v6.
+    
+    Two-layer approach:
+    1. Ask Gemini to write v6 code
+    2. If that fails/is too short, use a hand-validated v6 fallback template
+    
+    Key Pine Script v6 rules enforced in the fallback:
+    - ASCII-only (no Unicode dashes in comments — they break the parser)
+    - Single quotes for all string literals (avoids JSON double-quote conflicts)
+    - strategy.exit() outside all if-blocks (runs every bar with stored vars)
+    - alertcondition() with single-quoted JSON message (double quotes inside)
+    - 4-space indentation only
+    - var float declared at script scope, not inside blocks
+    """
     s        = strategy
     name     = s.get("name", f"{symbol} Strategy")
     stype    = s.get("type", "trend_following")
@@ -629,109 +642,133 @@ def _gen_pine_script(symbol: str, strategy: dict, timeframe: str) -> str:
     tgt_r    = round(float(tgt_mult), 1)
     filters  = "; ".join(s.get("filters", []))
 
+    # Ask Gemini for v6 Pine Script
     prompt = (
-        f"Write Pine Script VERSION 6 for NSE strategy. Return ONLY code, no markdown.\n\n"
+        "Write Pine Script VERSION 6 for NSE strategy. Return ONLY code, no markdown, no explanation.\n\n"
         f"Strategy: {name} | Type: {stype} | Symbol: {symbol} | TF: {timeframe}\n"
         f"Entry: {entries}\n"
-        f"SL: {sl_r}x ATR | Target: {tgt_r}x risk | Hold: {hold} bars\n"
+        f"SL: {sl_r}x ATR | Target: {tgt_r}x risk | Hold max: {hold} bars\n"
         f"Filters: {filters}\n\n"
-        f"CRITICAL v6 rules:\n"
-        f"1. //@version=6 first line\n"
-        f"2. strategy() on its own line\n"
-        f"3. var float slLevel=na and var float tgtLevel=na declared outside if-blocks\n"
-        f"4. strategy.exit() called OUTSIDE if-blocks every bar\n"
-        f"5. Use alertcondition() not alert() inside if-blocks\n"
-        f"6. alert.freq_once_per_bar (freq_once_per_bar_close removed in v6)\n"
-        f"7. 4-space indentation inside if-blocks\n"
-        f"8. No semicolons"
+        "CRITICAL Pine Script v6 rules -- follow exactly or code errors:\n"
+        "1. //@version=6 as first line\n"
+        "2. Use SINGLE QUOTES for ALL string literals (title, message, entry IDs)\n"
+        "3. var float slLevel = na  and  var float tgtLevel = na  OUTSIDE all if-blocks\n"
+        "4. strategy.exit() called OUTSIDE if-blocks (not inside if entryLong block)\n"
+        "5. alertcondition() with single-quoted JSON: message='{\"key\":\"val\"}'\n"
+        "6. NO Unicode chars in comments (no em-dash, no special dashes)\n"
+        "7. Exactly 4 spaces for indentation inside if-blocks\n"
+        "8. No semicolons at end of lines\n"
     )
 
     code = _gemini("", prompt, max_tokens=2000)
 
     if code and len(code.strip()) >= 100:
+        # Clean markdown fences
         code = re.sub(r"```(?:pine|pinescript|pine.?script)?", "", code, flags=re.IGNORECASE)
         code = code.strip().strip("`").strip()
+        # Upgrade v5 tag if Gemini ignored instruction
         code = code.replace("//@version=5", "//@version=6")
+        # Remove freq_once_per_bar_close (removed in v6)
         code = code.replace("alert.freq_once_per_bar_close", "alert.freq_once_per_bar")
+        # Strip non-ASCII from comments (lines starting with //)
+        clean_lines = []
+        for line in code.split("\n"):
+            stripped = line.lstrip()
+            if stripped.startswith("//"):
+                line = line.encode("ascii", "ignore").decode("ascii")
+            clean_lines.append(line)
+        code = "\n".join(clean_lines)
         if "//@version" in code and "strategy(" in code:
             return code
 
-    # ── Hand-written v6 fallback (guaranteed to compile) ─────────────────────
-    wb  = "{" + f'"symbol":"{symbol}","action":"BUY","timeframe":"{timeframe}"' + "}"
-    ws  = "{" + f'"symbol":"{symbol}","action":"SELL","timeframe":"{timeframe}"' + "}"
-    return (
-        "//@version=6\n"
-        f'strategy("{name}", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.1)\n'
-        "\n"
-        "// ── Inputs ─────────────────────────────────────────────────────────\n"
-        f"slMulti  = input.float({sl_r},  title=\"SL ATR Multiple\",  minval=0.5, maxval=5.0,  step=0.1)\n"
-        f"tgtMulti = input.float({tgt_r}, title=\"Tgt ATR Multiple\", minval=1.0, maxval=10.0, step=0.1)\n"
-        "emaFast  = input.int(9,  title=\"EMA Fast\")\n"
-        "emaSlow  = input.int(21, title=\"EMA Slow\")\n"
-        "emaFilter= input.int(50, title=\"EMA Trend Filter\")\n"
-        "\n"
-        "// ── Indicators ──────────────────────────────────────────────────────\n"
-        "e_fast   = ta.ema(close, emaFast)\n"
-        "e_slow   = ta.ema(close, emaSlow)\n"
-        "e_filter = ta.ema(close, emaFilter)\n"
-        "rsi14    = ta.rsi(close, 14)\n"
-        "atr14    = ta.atr(14)\n"
-        "avgVol   = ta.sma(volume, 20)\n"
-        "\n"
-        "// ── Entry Signal ────────────────────────────────────────────────────\n"
-        "crossUp   = ta.crossover(e_fast, e_slow)\n"
-        "trendOk   = close > e_filter\n"
-        "rsiOk     = rsi14 > 50 and rsi14 < 75\n"
-        "volOk     = volume > avgVol * 1.3\n"
-        "entryLong = crossUp and trendOk and rsiOk and volOk\n"
-        "\n"
-        "// ── Trade Levels (persistent var — set once on entry bar) ───────────\n"
-        "var float slLevel  = na\n"
-        "var float tgtLevel = na\n"
-        "\n"
-        "if entryLong and strategy.position_size == 0\n"
-        "    slLevel  := close - slMulti * atr14\n"
-        "    tgtLevel := close + tgtMulti * (close - slLevel)\n"
-        "    strategy.entry(\"Long\", strategy.long)\n"
-        "\n"
-        "if strategy.position_size == 0 and not entryLong\n"
-        "    slLevel  := na\n"
-        "    tgtLevel := na\n"
-        "\n"
-        "// strategy.exit runs every bar — v6 requires it outside if-blocks\n"
-        "strategy.exit(\"Exit Long\", from_entry=\"Long\", stop=slLevel, limit=tgtLevel)\n"
-        "\n"
-        "// ── Alert Conditions ────────────────────────────────────────────────\n"
-        f'alertcondition(entryLong and strategy.position_size[1] == 0, title=\"BUY Signal\", message=\"{wb}\")\n'
-        f'alertcondition(strategy.position_size[1] > 0 and strategy.position_size == 0, title=\"SELL Signal\", message=\"{ws}\")\n'
-        "\n"
-        "// ── Plots ───────────────────────────────────────────────────────────\n"
-        "plot(e_fast,   \"EMA Fast\",   color=color.blue,   linewidth=1)\n"
-        "plot(e_slow,   \"EMA Slow\",   color=color.orange, linewidth=1)\n"
-        "plot(e_filter, \"EMA Filter\", color=color.new(color.green, 20), linewidth=2)\n"
-        "plot(strategy.position_size > 0 ? slLevel  : na, \"Stop Loss\", color.red,   1, plot.style_linebr)\n"
-        "plot(strategy.position_size > 0 ? tgtLevel : na, \"Target\",    color.green, 1, plot.style_linebr)\n"
-        "plotshape(entryLong, \"Buy\", shape.triangleup, location.belowbar, color.new(color.lime,0), size=size.small)\n"
-        "bgcolor(strategy.position_size > 0 ? color.new(color.lime, 93) : na)\n"
-        "\n"
-        "// ── Info Table ──────────────────────────────────────────────────────\n"
-        "var table infoTbl = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black,70), border_width=1)\n"
-        "if barstate.islast\n"
-        f'    table.cell(infoTbl, 0, 0, \"Strategy\",  text_color=color.gray,   text_size=size.small)\n'
-        f'    table.cell(infoTbl, 1, 0, \"{name}\",    text_color=color.white,  text_size=size.small)\n'
-        f'    table.cell(infoTbl, 0, 1, \"Symbol\",    text_color=color.gray,   text_size=size.small)\n'
-        f'    table.cell(infoTbl, 1, 1, \"{symbol}\",  text_color=color.yellow, text_size=size.small)\n'
-        f'    table.cell(infoTbl, 0, 2, \"TF\",        text_color=color.gray,   text_size=size.small)\n'
-        f'    table.cell(infoTbl, 1, 2, \"{timeframe}\", text_color=color.aqua, text_size=size.small)\n'
-        f'    table.cell(infoTbl, 0, 3, \"R:R\",       text_color=color.gray,   text_size=size.small)\n'
-        f'    table.cell(infoTbl, 1, 3, \"1:{tgt_r}\", text_color=color.lime,   text_size=size.small)\n'
-        "\n"
-        "// ── How to set up alerts in TradingView ─────────────────────────────\n"
-        "// 1. Add to chart → Click bell icon (Alerts)\n"
-        "// 2. Condition: select this script → BUY Signal or SELL Signal\n"
-        f"// 3. Webhook URL: YOUR_RENDER_URL/api/tv-signal\n"
-        "// 4. The message is pre-filled from alertcondition above"
-    )
+    # ── Hand-validated v6 fallback template ─────────────────────────────────
+    # JSON webhook payloads -- single quotes wrap the string, JSON uses double quotes inside
+    wb = '{"symbol":"' + symbol + '","action":"BUY","timeframe":"' + timeframe + '"}'
+    ws = '{"symbol":"' + symbol + '","action":"SELL","timeframe":"' + timeframe + '"}'
+
+    lines = [
+        "//@version=6",
+        f"strategy('{name}', overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.1)",
+        "",
+        "// -- Inputs",
+        f"slMulti  = input.float({sl_r},  title='SL ATR Multiple',  minval=0.5, maxval=5.0,  step=0.1)",
+        f"tgtMulti = input.float({tgt_r}, title='Tgt ATR Multiple', minval=1.0, maxval=10.0, step=0.1)",
+        "emaFast   = input.int(9,  title='EMA Fast')",
+        "emaSlow   = input.int(21, title='EMA Slow')",
+        "emaFilter = input.int(50, title='EMA Trend Filter')",
+        "",
+        "// -- Indicators",
+        "e_fast   = ta.ema(close, emaFast)",
+        "e_slow   = ta.ema(close, emaSlow)",
+        "e_filter = ta.ema(close, emaFilter)",
+        "rsi14    = ta.rsi(close, 14)",
+        "atr14    = ta.atr(14)",
+        "avgVol   = ta.sma(volume, 20)",
+        "",
+        "// -- Entry conditions",
+        "crossUp   = ta.crossover(e_fast, e_slow)",
+        "trendOk   = close > e_filter",
+        "rsiOk     = rsi14 > 50 and rsi14 < 75",
+        "volOk     = volume > avgVol * 1.3",
+        "entryLong = crossUp and trendOk and rsiOk and volOk",
+        "",
+        "// -- Trade levels (var keeps value across bars)",
+        "var float slLevel  = na",
+        "var float tgtLevel = na",
+        "",
+        "// Set on entry bar",
+        "if entryLong and strategy.position_size == 0",
+        "    slLevel  := close - slMulti * atr14",
+        "    tgtLevel := close + tgtMulti * (close - slLevel)",
+        "    strategy.entry('Long', strategy.long)",
+        "",
+        "// Reset when flat",
+        "if strategy.position_size == 0 and not entryLong",
+        "    slLevel  := na",
+        "    tgtLevel := na",
+        "",
+        "// strategy.exit outside if-block (Pine v6 requirement)",
+        "strategy.exit('Exit Long', from_entry='Long', stop=slLevel, limit=tgtLevel)",
+        "",
+        "// -- Alerts",
+        f"alertcondition(entryLong and strategy.position_size[1] == 0, title='BUY Signal', message='{wb}')",
+        f"alertcondition(strategy.position_size[1] > 0 and strategy.position_size == 0, title='SELL Signal', message='{ws}')",
+        "",
+        "// -- Plots",
+        "plot(e_fast,   'EMA Fast',   color=color.blue,   linewidth=1)",
+        "plot(e_slow,   'EMA Slow',   color=color.orange, linewidth=1)",
+        "plot(e_filter, 'EMA Filter', color=color.new(color.green, 20), linewidth=2)",
+        "plot(strategy.position_size > 0 ? slLevel  : na, 'Stop Loss', color.red,   1, plot.style_linebr)",
+        "plot(strategy.position_size > 0 ? tgtLevel : na, 'Target',    color.green, 1, plot.style_linebr)",
+        "plotshape(entryLong, 'Buy Signal', shape.triangleup, location.belowbar, color.new(color.lime, 0), size=size.small)",
+        "bgcolor(strategy.position_size > 0 ? color.new(color.lime, 93) : na)",
+        "",
+        "// -- Info table",
+        "var table infoTbl = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 70), border_width=1)",
+        "if barstate.islast",
+        "    table.cell(infoTbl, 0, 0, 'Strategy',   text_color=color.gray,   text_size=size.small)",
+        f"    table.cell(infoTbl, 1, 0, '{name}',    text_color=color.white,  text_size=size.small)",
+        "    table.cell(infoTbl, 0, 1, 'Symbol',     text_color=color.gray,   text_size=size.small)",
+        f"    table.cell(infoTbl, 1, 1, '{symbol}',  text_color=color.yellow, text_size=size.small)",
+        "    table.cell(infoTbl, 0, 2, 'Timeframe',  text_color=color.gray,   text_size=size.small)",
+        f"    table.cell(infoTbl, 1, 2, '{timeframe}', text_color=color.aqua, text_size=size.small)",
+        "    table.cell(infoTbl, 0, 3, 'Risk:Reward', text_color=color.gray,  text_size=size.small)",
+        f"    table.cell(infoTbl, 1, 3, '1:{tgt_r}', text_color=color.lime,   text_size=size.small)",
+        "",
+        "// -- Webhook instructions:",
+        "// 1. Add script to chart",
+        "// 2. Click Alerts (bell icon) -> Create Alert",
+        "// 3. Condition: select this script -> 'BUY Signal' or 'SELL Signal'",
+        "// 4. Webhook URL: YOUR_RENDER_URL/api/tv-signal",
+        "// 5. Message is pre-filled from alertcondition above",
+    ]
+
+    # Final safety: strip any non-ASCII that may have crept in via f-string values
+    clean = []
+    for line in lines:
+        clean.append(line.encode("ascii", "ignore").decode("ascii"))
+
+    return "\n".join(clean)
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────

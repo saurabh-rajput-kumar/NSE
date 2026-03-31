@@ -1397,3 +1397,501 @@ def sr_zones_batch():
 
     results.sort(key=lambda x: abs(x["closest_zone"]["dist_pct"]))
     return jsonify({"results": results, "timeframe": timeframe, "total": len(results)})
+
+
+# ── Signal Engine & Market Strategy ───────────────────────────────────────────
+
+def _detect_candle_patterns(bars: list) -> list:
+    """Detect candlestick patterns in last 20 bars."""
+    patterns = []
+    n = len(bars)
+    if n < 3:
+        return patterns
+    
+    def body(b): return abs(b['c'] - b['o'])
+    def rng(b):  return b['h'] - b['l']
+    def upper_wick(b): return b['h'] - max(b['c'], b['o'])
+    def lower_wick(b): return min(b['c'], b['o']) - b['l']
+    
+    # Check last 5 bars for patterns
+    for i in range(max(1, n-5), n):
+        b   = bars[i]
+        b1  = bars[i-1]
+        bd  = body(b)
+        rg  = rng(b)
+        uw  = upper_wick(b)
+        lw  = lower_wick(b)
+        bull = b['c'] > b['o']
+        
+        # Hammer / Pin Bar (bullish reversal)
+        if lw >= bd * 2.5 and uw <= bd * 0.3 and rg > 0 and b1['c'] < b1['o']:
+            patterns.append({'name': 'Hammer / Pin Bar', 'bullish': True,
+                             'level': round(b['l'], 2), 'bar': i})
+        
+        # Shooting Star (bearish reversal)
+        if uw >= bd * 2.5 and lw <= bd * 0.3 and rg > 0 and b1['c'] > b1['o']:
+            patterns.append({'name': 'Shooting Star', 'bullish': False,
+                             'level': round(b['h'], 2), 'bar': i})
+        
+        # Bullish Engulfing
+        if (bull and not (b1['c'] > b1['o']) and
+            b['o'] <= b1['c'] and b['c'] >= b1['o'] and bd > body(b1) * 1.2):
+            patterns.append({'name': 'Bullish Engulfing', 'bullish': True,
+                             'level': round(b['l'], 2), 'bar': i})
+        
+        # Bearish Engulfing
+        if (not bull and b1['c'] > b1['o'] and
+            b['o'] >= b1['c'] and b['c'] <= b1['o'] and bd > body(b1) * 1.2):
+            patterns.append({'name': 'Bearish Engulfing', 'bullish': False,
+                             'level': round(b['h'], 2), 'bar': i})
+        
+        # Doji (indecision)
+        if bd <= rg * 0.1 and rg > 0:
+            patterns.append({'name': 'Doji', 'bullish': None,
+                             'level': round(b['c'], 2), 'bar': i})
+    
+    return patterns[-6:]  # last 6 patterns
+
+
+def _detect_fvg(bars: list, current_price: float) -> list:
+    """Detect Fair Value Gaps (imbalances) in last 50 bars."""
+    fvgs = []
+    n = len(bars)
+    for i in range(2, min(n, 50)):
+        # Bullish FVG: gap between bar[i-2].high and bar[i].low
+        if bars[i]['l'] > bars[i-2]['h']:
+            gap_lo = bars[i-2]['h']
+            gap_hi = bars[i]['l']
+            filled = any(bars[j]['l'] <= gap_hi and bars[j]['h'] >= gap_lo
+                        for j in range(i+1, n))
+            fvgs.append({
+                'type': 'bullish', 'lo': round(gap_lo, 2), 'hi': round(gap_hi, 2),
+                'mid': round((gap_lo + gap_hi) / 2, 2),
+                'filled': filled, 'date': bars[i]['d'],
+                'near': abs(current_price - (gap_lo+gap_hi)/2) / current_price < 0.02
+            })
+        # Bearish FVG: gap between bar[i-2].low and bar[i].high
+        if bars[i]['h'] < bars[i-2]['l']:
+            gap_lo = bars[i]['h']
+            gap_hi = bars[i-2]['l']
+            filled = any(bars[j]['l'] <= gap_hi and bars[j]['h'] >= gap_lo
+                        for j in range(i+1, n))
+            fvgs.append({
+                'type': 'bearish', 'lo': round(gap_lo, 2), 'hi': round(gap_hi, 2),
+                'mid': round((gap_lo + gap_hi) / 2, 2),
+                'filled': filled, 'date': bars[i]['d'],
+                'near': abs(current_price - (gap_lo+gap_hi)/2) / current_price < 0.02
+            })
+    
+    # Return unfilled FVGs near current price first
+    fvgs = [f for f in fvgs if not f['filled']]
+    fvgs.sort(key=lambda x: abs(current_price - x['mid']))
+    return fvgs[:6]
+
+
+def _detect_order_blocks(bars: list, current_price: float) -> list:
+    """Detect SMC order blocks — last strong impulse candle before a move."""
+    n = len(bars)
+    if n < 5:
+        return []
+    
+    obs = []
+    closes = [b['c'] for b in bars]
+    
+    # Find swing highs/lows in last 60 bars
+    for i in range(3, min(n-3, 60)):
+        # Bearish OB: last bullish candle before strong bearish move
+        if (bars[i]['c'] > bars[i]['o'] and  # bullish candle
+            bars[i+1]['c'] < bars[i+1]['o'] and  # followed by bearish
+            bars[i+1]['c'] < bars[i]['l']):  # breaks below
+            obs.append({
+                'type': 'bearish_ob',
+                'lo': round(bars[i]['o'], 2),
+                'hi': round(bars[i]['h'], 2),
+                'date': bars[i]['d'],
+                'near': current_price <= bars[i]['h'] * 1.005 and current_price >= bars[i]['o'] * 0.995
+            })
+        # Bullish OB: last bearish candle before strong bullish move
+        if (bars[i]['c'] < bars[i]['o'] and  # bearish candle
+            bars[i+1]['c'] > bars[i+1]['o'] and  # followed by bullish
+            bars[i+1]['c'] > bars[i]['h']):  # breaks above
+            obs.append({
+                'type': 'bullish_ob',
+                'lo': round(bars[i]['l'], 2),
+                'hi': round(bars[i]['o'], 2),
+                'date': bars[i]['d'],
+                'near': current_price >= bars[i]['l'] * 0.995 and current_price <= bars[i]['o'] * 1.005
+            })
+    
+    # Near OBs first
+    obs.sort(key=lambda x: (not x['near'], abs(current_price - (x['lo']+x['hi'])/2)))
+    return obs[:4]
+
+
+def _compute_vwap(bars: list) -> float | None:
+    """Compute VWAP for the available bars."""
+    total_pv = sum((b['h']+b['l']+b['c'])/3 * b['v'] for b in bars)
+    total_v  = sum(b['v'] for b in bars)
+    return round(total_pv / total_v, 2) if total_v > 0 else None
+
+
+def _compute_emas(closes: list) -> dict:
+    def ema(arr, p):
+        if len(arr) < p: return arr[-1] if arr else 0
+        k = 2/(p+1); e = arr[0]
+        for x in arr[1:]: e = x*k + e*(1-k)
+        return round(e, 2)
+    n = len(closes)
+    return {
+        'ema9':  ema(closes[-15:],   9),
+        'ema21': ema(closes[-30:],  21),
+        'ema50': ema(closes[-65:],  50) if n >= 55 else None,
+        'ema200':ema(closes[-210:],200) if n >= 200 else None,
+    }
+
+
+def _generate_market_signals(bars: list, indicators: dict, patterns: list,
+                              fvgs: list, obs: list, symbol: str,
+                              timeframe: str, asset_type: str) -> list:
+    """Generate trading signals from all detected structures."""
+    signals = []
+    n = len(bars)
+    if n < 10:
+        return signals
+    
+    price   = bars[-1]['c']
+    atr     = indicators.get('atr14', price * 0.01)
+    emas    = indicators.get('emas', {})
+    rsi     = indicators.get('rsi14', 50)
+    vwap    = indicators.get('vwap')
+    
+    # Risk levels
+    risk_unit = atr * 1.5
+    
+    def make_signal(direction, signal_type, entry, sl, pattern_name, confidence, reason):
+        risk     = abs(entry - sl)
+        if risk <= 0: return None
+        t1 = round(entry + risk * 2   if direction == 'LONG' else entry - risk * 2,   2)
+        t2 = round(entry + risk * 3   if direction == 'LONG' else entry - risk * 3,   2)
+        t3 = round(entry + risk * 5   if direction == 'LONG' else entry - risk * 5,   2)
+        rr = round(abs(t1 - entry) / risk, 1)
+        return {
+            'direction':   direction,
+            'signal_type': signal_type,
+            'pattern':     pattern_name,
+            'entry':       round(entry, 2),
+            'sl':          round(sl,    2),
+            'target1':     t1,
+            'target2':     t2,
+            'target3':     t3,
+            'rr':          rr,
+            'trail_method': f'Move SL to entry after T1 hit, then trail 1.5x ATR (₹{round(atr*1.5,1)}) below each new high',
+            'confidence':  confidence,
+            'reason':      reason,
+        }
+    
+    # ── Signal 1: EMA Crossover ────────────────────────────────────────────────
+    e9 = emas.get('ema9'); e21 = emas.get('ema21'); e50 = emas.get('ema50')
+    if e9 and e21:
+        # Check if cross happened in last 3 bars
+        prev_closes = [b['c'] for b in bars[-6:-1]]
+        if len(prev_closes) >= 5:
+            from functools import reduce
+            def ema_val(arr, p):
+                k = 2/(p+1); e = arr[0]
+                for x in arr[1:]: e = x*k + e*(1-k)
+                return e
+            prev_e9  = ema_val(prev_closes[-10:] if len(prev_closes)>=10 else prev_closes, min(9,  len(prev_closes)))
+            prev_e21 = ema_val(prev_closes[-20:] if len(prev_closes)>=20 else prev_closes, min(21, len(prev_closes)))
+            fresh_cross_up   = e9 > e21 and prev_e9 <= prev_e21
+            fresh_cross_down = e9 < e21 and prev_e9 >= prev_e21
+            
+            if fresh_cross_up and rsi > 50 and (e50 is None or price > e50):
+                sl_lv = round(min(b['l'] for b in bars[-5:]) - atr*0.3, 2)
+                sig = make_signal('LONG', 'EMA Crossover', price, sl_lv,
+                                  'EMA9 x EMA21 (Golden Cross)', 72,
+                                  f'EMA9 ({e9}) just crossed above EMA21 ({e21}). RSI {rsi:.0f} confirms momentum. '
+                                  f'{'Price above EMA50 — structural uptrend.' if e50 and price > e50 else ""}')
+                if sig: signals.append(sig)
+            
+            elif fresh_cross_down and rsi < 50 and (e50 is None or price < e50):
+                sl_lv = round(max(b['h'] for b in bars[-5:]) + atr*0.3, 2)
+                sig = make_signal('SHORT', 'EMA Crossover', price, sl_lv,
+                                  'EMA9 x EMA21 (Death Cross)', 68,
+                                  f'EMA9 ({e9}) just crossed below EMA21 ({e21}). RSI {rsi:.0f} confirms bearish momentum.')
+                if sig: signals.append(sig)
+    
+    # ── Signal 2: FVG Fill Setup ──────────────────────────────────────────────
+    for fvg in fvgs[:2]:
+        if fvg['near']:
+            if fvg['type'] == 'bullish' and price <= fvg['hi'] * 1.01 and price >= fvg['lo'] * 0.99:
+                # Price in bullish FVG — buy the retest
+                sl_lv = round(fvg['lo'] - atr * 0.5, 2)
+                sig = make_signal('LONG', 'FVG Retest', price, sl_lv,
+                                  'Bullish Fair Value Gap',  75,
+                                  f'Price retesting bullish FVG at ₹{fvg["lo"]}–₹{fvg["hi"]}. '
+                                  f'FVGs act as support — institutions often buy these imbalances.')
+                if sig: signals.append(sig)
+            elif fvg['type'] == 'bearish' and price >= fvg['lo'] * 0.99 and price <= fvg['hi'] * 1.01:
+                sl_lv = round(fvg['hi'] + atr * 0.5, 2)
+                sig = make_signal('SHORT', 'FVG Retest', price, sl_lv,
+                                  'Bearish Fair Value Gap', 73,
+                                  f'Price retesting bearish FVG at ₹{fvg["lo"]}–₹{fvg["hi"]}. '
+                                  f'Resistance zone — look for rejection.')
+                if sig: signals.append(sig)
+    
+    # ── Signal 3: Order Block Reaction ────────────────────────────────────────
+    for ob in obs:
+        if ob['near']:
+            if ob['type'] == 'bullish_ob':
+                sl_lv = round(ob['lo'] - atr * 0.3, 2)
+                sig = make_signal('LONG', 'Order Block', price, sl_lv,
+                                  'Bullish Order Block', 70,
+                                  f'Price at bullish order block (₹{ob["lo"]}–₹{ob["hi"]}). '
+                                  f'This was the last bearish candle before a strong bullish impulse — institutions left orders here.')
+                if sig: signals.append(sig)
+            elif ob['type'] == 'bearish_ob':
+                sl_lv = round(ob['hi'] + atr * 0.3, 2)
+                sig = make_signal('SHORT', 'Order Block', price, sl_lv,
+                                  'Bearish Order Block', 68,
+                                  f'Price at bearish order block (₹{ob["lo"]}–₹{ob["hi"]}). '
+                                  f'Institutional sell orders likely resting here.')
+                if sig: signals.append(sig)
+    
+    # ── Signal 4: VWAP Deviation ──────────────────────────────────────────────
+    if vwap:
+        deviation = (price - vwap) / vwap * 100
+        if deviation < -1.5 and rsi < 45:  # Extended below VWAP
+            sl_lv = round(price - atr * 1.5, 2)
+            sig = make_signal('LONG', 'VWAP Reversion', price, sl_lv,
+                              'Below VWAP Reversion', 65,
+                              f'Price {abs(deviation):.1f}% below VWAP ({vwap}). '
+                              f'RSI {rsi:.0f} oversold. Mean-reversion setup back toward VWAP.')
+            if sig: signals.append(sig)
+        elif deviation > 1.5 and rsi > 65:  # Extended above VWAP
+            sl_lv = round(price + atr * 1.5, 2)
+            sig = make_signal('SHORT', 'VWAP Reversion', price, sl_lv,
+                              'Above VWAP Reversion', 62,
+                              f'Price {deviation:.1f}% above VWAP ({vwap}). '
+                              f'RSI {rsi:.0f} overbought. Fade back toward VWAP.')
+            if sig: signals.append(sig)
+    
+    # ── Signal 5: Candlestick pattern at key level ─────────────────────────────
+    recent_patterns = [p for p in patterns if p.get('bullish') is not None]
+    for pat in recent_patterns[:1]:
+        if pat['bullish']:
+            sl_lv = round(bars[-1]['l'] - atr * 0.3, 2)
+            sig = make_signal('LONG', 'Pattern Signal', price, sl_lv,
+                              pat['name'], 60,
+                              f'{pat["name"]} detected at ₹{pat["level"]}. '
+                              f'Wait for next candle confirmation before entering.')
+            if sig: signals.append(sig)
+        else:
+            sl_lv = round(bars[-1]['h'] + atr * 0.3, 2)
+            sig = make_signal('SHORT', 'Pattern Signal', price, sl_lv,
+                              pat['name'], 58,
+                              f'{pat["name"]} at ₹{pat["level"]}. '
+                              f'Bearish reversal — wait for confirmation candle.')
+            if sig: signals.append(sig)
+    
+    # Sort by confidence, deduplicate direction
+    signals.sort(key=lambda x: -x['confidence'])
+    return signals[:3]  # top 3 signals max
+
+
+def _gemini_market_analysis(symbol: str, timeframe: str, bars: list,
+                              indicators: dict, patterns: list, fvgs: list,
+                              obs: list) -> str:
+    """Ask Gemini for 3-4 sentence market structure analysis."""
+    if not GEMINI_API_KEY:
+        return ""
+    
+    price  = bars[-1]['c']
+    emas   = indicators.get('emas', {})
+    rsi    = indicators.get('rsi14', 50)
+    vwap   = indicators.get('vwap')
+    
+    # Compact context
+    pat_str = ", ".join(p['name'] for p in patterns[:4]) or "none"
+    fvg_str = "; ".join(f"{'Bull' if f['type']=='bullish' else 'Bear'} FVG {f['lo']}-{f['hi']}"
+                        for f in fvgs[:3]) or "none"
+    ob_str  = "; ".join(f"{'Bull' if 'bullish' in ob['type'] else 'Bear'} OB {ob['lo']}-{ob['hi']}"
+                        for ob in obs[:2]) or "none"
+    
+    # Last 20 bars compact
+    recent = bars[-20:]
+    bars_txt = " | ".join(f"{b['d'][5:]}: O{b['o']:.0f} H{b['h']:.0f} L{b['l']:.0f} C{b['c']:.0f}"
+                           for b in recent[-10:])
+    
+    prompt = (
+        f"Analyze {symbol} {timeframe} market structure. Be concise — 3 sentences max.\n\n"
+        f"Price: {price} | RSI: {rsi:.0f} | VWAP: {vwap or 'N/A'}\n"
+        f"EMA9: {emas.get('ema9','?')} | EMA21: {emas.get('ema21','?')} | EMA50: {emas.get('ema50','?')}\n"
+        f"Patterns: {pat_str}\n"
+        f"FVGs: {fvg_str}\n"
+        f"Order Blocks: {ob_str}\n"
+        f"Recent bars: {bars_txt}\n\n"
+        "Describe: (1) current market structure (trending/ranging/reversing), "
+        "(2) which pattern/level is most significant RIGHT NOW, "
+        "(3) what traders should watch for next. Keep it practical."
+    )
+    
+    return _gemini("", prompt, max_tokens=300) or ""
+
+
+@app.route("/api/signals", methods=["POST"])
+def get_signals():
+    """Signal engine for AI Analyze tab — runs on any NSE stock."""
+    body      = freq.get_json(silent=True) or {}
+    symbol    = str(body.get("symbol", "")).upper().strip()
+    timeframe = str(body.get("timeframe", "daily")).lower()
+    
+    if not symbol:
+        return jsonify({"error": "symbol required"}), 400
+    
+    sym_yf = symbol + ".NS" if not symbol.endswith(".NS") and not symbol.startswith("^") else symbol
+    
+    if timeframe == "15min":
+        raw = fetch_yahoo(sym_yf, interval="15m", range_="60d")
+    elif timeframe in ("1hr", "4hr"):
+        raw = fetch_yahoo(sym_yf, interval="60m", range_="1y")
+    else:
+        raw = fetch_yahoo(sym_yf, interval="1d", range_="1y")
+    
+    if not raw:
+        return jsonify({"signals": []})
+    
+    bars = _parse_ohlcv(raw, symbol)
+    if len(bars) < 20:
+        return jsonify({"signals": []})
+    
+    # For 4hr: aggregate 1hr bars into 4-bar groups
+    if timeframe == "4hr":
+        agg = []
+        for i in range(0, len(bars)-3, 4):
+            chunk = bars[i:i+4]
+            agg.append({
+                'd': chunk[0]['d'], 't': chunk[0]['t'],
+                'o': chunk[0]['o'], 'c': chunk[-1]['c'],
+                'h': max(b['h'] for b in chunk),
+                'l': min(b['l'] for b in chunk),
+                'v': sum(b['v'] for b in chunk),
+            })
+        bars = agg
+    
+    closes  = [b['c'] for b in bars]
+    price   = closes[-1]
+    
+    indicators = _compute_indicators(bars)
+    indicators['emas'] = _compute_emas(closes)
+    indicators['vwap'] = _compute_vwap(bars[-50:])
+    
+    patterns = _detect_candle_patterns(bars)
+    fvgs     = _detect_fvg(bars, price)
+    obs      = _detect_order_blocks(bars, price)
+    
+    signals  = _generate_market_signals(bars, indicators, patterns, fvgs, obs,
+                                         symbol, timeframe, "stock")
+    
+    return jsonify({"signals": signals, "patterns": patterns[:4]})
+
+
+@app.route("/api/market-strategy", methods=["POST"])
+def market_strategy():
+    """Full market strategy for Nifty/Crypto tabs — signals + AI analysis + key levels."""
+    body      = freq.get_json(silent=True) or {}
+    symbol    = str(body.get("symbol",    "")).strip()
+    timeframe = str(body.get("timeframe", "15min")).lower()
+    asset_type= str(body.get("type",      "nifty")).lower()  # "nifty" | "crypto"
+    
+    if not symbol:
+        return jsonify({"error": "symbol required"}), 400
+    
+    # Map timeframe → Yahoo interval + range
+    tf_map = {
+        "5min":  ("5m",  "60d"),
+        "15min": ("15m", "60d"),
+        "1hr":   ("60m", "730d"),
+        "4hr":   ("60m", "730d"),   # aggregate client-side
+        "daily": ("1d",  "1825d"),  # 5 years for crypto
+    }
+    interval, range_ = tf_map.get(timeframe, ("15m", "60d"))
+    
+    raw = fetch_yahoo(symbol, interval=interval, range_=range_)
+    if not raw:
+        return jsonify({"error": f"Could not fetch data for {symbol}. Check symbol."}), 404
+    
+    bars = _parse_ohlcv(raw, symbol)
+    if len(bars) < 30:
+        return jsonify({"error": f"Insufficient data ({len(bars)} bars)."}), 400
+    
+    # Aggregate to 4hr if requested
+    if timeframe == "4hr":
+        agg = []
+        for i in range(0, len(bars)-3, 4):
+            chunk = bars[i:i+4]
+            agg.append({
+                'd': chunk[0]['d'], 't': chunk[0]['t'],
+                'o': chunk[0]['o'], 'c': chunk[-1]['c'],
+                'h': max(b['h'] for b in chunk),
+                'l': min(b['l'] for b in chunk),
+                'v': sum(b['v'] for b in chunk),
+            })
+        bars = agg
+    
+    closes  = [b['c'] for b in bars]
+    price   = closes[-1]
+    
+    # Indicators
+    indicators = _compute_indicators(bars)
+    indicators['emas'] = _compute_emas(closes)
+    indicators['vwap'] = _compute_vwap(bars[-100:])  # rolling VWAP last 100 bars
+    
+    # Structure detection
+    patterns = _detect_candle_patterns(bars)
+    fvgs     = _detect_fvg(bars, price)
+    obs      = _detect_order_blocks(bars, price)
+    
+    # Signals
+    signals  = _generate_market_signals(bars, indicators, patterns, fvgs, obs,
+                                         symbol, timeframe, asset_type)
+    
+    # Key levels from S/R computation
+    sr_data  = _find_sr_zones(bars, price)
+    levels   = {
+        "supports":    [round(z['center'], 2) for z in sr_data.get('supports',    [])[:3]],
+        "resistances": [round(z['center'], 2) for z in sr_data.get('resistances', [])[:3]],
+    }
+    
+    # Gemini market analysis (brief — 3 sentences)
+    ai_analysis = _gemini_market_analysis(symbol, timeframe, bars, indicators,
+                                           patterns, fvgs, obs)
+    
+    # Asset name mapping
+    names = {
+        "^NSEI": "Nifty 50", "^NSEBANK": "Nifty Bank",
+        "BTC-USD": "Bitcoin (BTC/USD)", "ETH-USD": "Ethereum (ETH/USD)",
+        "GC=F": "Gold (XAU/USD)",
+    }
+    
+    return jsonify({
+        "symbol":         symbol,
+        "name":           names.get(symbol, symbol),
+        "timeframe":      timeframe,
+        "current_price":  price,
+        "bars_analyzed":  len(bars),
+        "signals":        signals,
+        "patterns":       patterns,
+        "fvgs":           fvgs[:4],
+        "order_blocks":   obs[:3],
+        "levels":         levels,
+        "ai_analysis":    ai_analysis,
+        "indicators":     {
+            "ema9":    indicators.get('emas', {}).get('ema9'),
+            "ema21":   indicators.get('emas', {}).get('ema21'),
+            "ema50":   indicators.get('emas', {}).get('ema50'),
+            "rsi14":   indicators.get('rsi14'),
+            "vwap":    indicators.get('vwap'),
+            "atr14":   indicators.get('atr14'),
+        },
+    })

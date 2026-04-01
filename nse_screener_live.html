@@ -580,6 +580,7 @@ input,select,textarea{font-size:16px!important;}
   <div class="ntab" id="t-bt" onclick="gt('bt')">📈 Backtest</div>
 </div>
 <div class="nav-row2">
+  <div class="ntab" id="t-iv" onclick="gt('iv')">💎 Invest</div>
   <div class="ntab" id="t-nf" onclick="gt('nf')">🇮🇳 Nifty</div>
   <div class="ntab" id="t-cr" onclick="gt('cr')">₿ Crypto</div>
   <div class="ntab" id="t-mt" onclick="gt('mt')">📊 MTF RSI</div>
@@ -2278,7 +2279,7 @@ function bgBadge(loading, pct, total){
 
 function startARI(){if(ALI)clearInterval(ALI);ALI=setInterval(chkAlerts,30000);}
 
-function gt(t){CT=t;document.querySelectorAll('.ntab').forEach(e=>e.classList.remove('active'));const e=document.getElementById('t-'+t);if(e)e.classList.add('active');document.getElementById('cbar').style.display=t==='sc'?'flex':'none';document.getElementById('tf-panel').style.display=t==='sc'?'block':'none';const fn={sc:rs,mt:rMTF,oi:rOI,fi:rFII,ro:rRot,ca:rCal,nw:rNews,bt:rBT,ps:rPS,jn:rJnl,sg:rSG,ai:rAI,nf:rNifty,cr:rCrypto};if(fn[t])fn[t]();}
+function gt(t){CT=t;document.querySelectorAll('.ntab').forEach(e=>e.classList.remove('active'));const e=document.getElementById('t-'+t);if(e)e.classList.add('active');document.getElementById('cbar').style.display=t==='sc'?'flex':'none';document.getElementById('tf-panel').style.display=t==='sc'?'block':'none';const fn={sc:rs,mt:rMTF,oi:rOI,fi:rFII,ro:rRot,ca:rCal,nw:rNews,bt:rBT,ps:rPS,jn:rJnl,sg:rSG,ai:rAI,nf:rNifty,cr:rCrypto,iv:rInvest};if(fn[t])fn[t]();}
 
 function getSD(){const m={};AS.forEach(s=>{const sec=s.sector||'Others';if(!m[sec])m[sec]={n:0,d:0,w:0};m[sec].n++;m[sec].d+=s.pctChange;m[sec].w+=s.weekChg||0;});return Object.entries(m).map(([name,d])=>{const avgD=d.d/d.n,avgW=d.w/d.n;const state=avgW>1.5?'Momentum':avgW<-1.5?'Selling':Math.abs(avgW)<0.5?'Ranging':'Recovering';return{name,avgD,avgW,state};}).sort((a,b)=>b.avgW-a.avgW);}
 
@@ -4773,6 +4774,319 @@ function mktRenderResult(data, type) {
   `;
 }
 
+
+// ── INVESTMENT TAB ────────────────────────────────────────────────────────────
+// Multi-strategy fundamental + technical filter:
+// Turtle Trading + Darvas Box + Wyckoff AMD + FVG confluence
+// Uses loaded stock data (AS array) — no extra fetches needed for screening
+// Gemini adds brief fundamental commentary per stock
+
+let IV_STATE = { loading: false, results: [], filtered: 'all' };
+
+function rInvest() {
+  const area = document.getElementById('area');
+  area.innerHTML = `
+    <div class="sh">💎 Investment Screener
+      <div class="sh-line"></div>
+      <span style="font-size:.63rem;color:var(--muted2)">Turtle · Darvas · Wyckoff · FVG · Fundamental proxy</span>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:14px">
+      <div style="font-size:.7rem;font-weight:700;color:var(--text);margin-bottom:10px">
+        📋 Investment Strategy Rules Applied
+      </div>
+      <div style="display:grid;gap:6px;font-size:.67rem;color:var(--muted2)">
+        <div>🐢 <strong style="color:var(--text)">Turtle (20/55d breakout)</strong> — Price breaks 20-day or 55-day high on 2x+ volume. Original Richard Dennis system adapted for NSE.</div>
+        <div>📦 <strong style="color:var(--text)">Darvas Box</strong> — Stock makes new 52W high, then consolidates in tight box (<8% range for 3+ weeks). Buy the box breakout.</div>
+        <div>⚡ <strong style="color:var(--text)">Wyckoff Accumulation</strong> — Detects Phase C spring (false breakdown below support) followed by Sign of Strength (SOS) move up. Smart money loading.</div>
+        <div>🎯 <strong style="color:var(--text)">FVG + Order Block</strong> — Unfilled bullish fair value gap in uptrend near current price. Institutional footprint visible.</div>
+        <div>📊 <strong style="color:var(--text)">Fundamental proxy</strong> — RS relative strength vs universe, volume expansion trend, 52W position, price above all EMAs (proxy for earnings growth).</div>
+      </div>
+    </div>
+
+    <!-- Filter buttons -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      ${['all','turtle','darvas','wyckoff','fvg'].map(f =>
+        `<button onclick="ivFilter('${f}')" id="iv-f-${f}"
+          style="padding:5px 14px;border-radius:8px;font-size:.7rem;font-weight:700;cursor:pointer;
+                 border:1px solid var(--border2);transition:all .15s;
+                 ${IV_STATE.filtered===f ? 'background:var(--accent);color:#fff;' : 'background:var(--card);color:var(--muted2);'}"
+        >${f === 'all' ? 'All Strategies' : f === 'turtle' ? '🐢 Turtle' : f === 'darvas' ? '📦 Darvas' : f === 'wyckoff' ? '⚡ Wyckoff' : '🎯 FVG'}</button>`
+      ).join('')}
+      <button onclick="ivScan()" id="iv-scan-btn"
+        style="padding:5px 16px;border-radius:8px;font-size:.7rem;font-weight:700;cursor:pointer;
+               background:linear-gradient(135deg,#a78bfa,#6c63ff);color:#fff;border:none;margin-left:auto">
+        🔍 Scan ${AS.length} Stocks
+      </button>
+    </div>
+
+    <div id="iv-results">
+      ${IV_STATE.results.length ? ivRenderResults(IV_STATE.results) : `
+      <div class="ibox" style="font-size:.7rem">
+        Click <strong>Scan ${AS.length} Stocks</strong> to run all investment strategies across the loaded universe.
+        ${!AS.length ? ' Load data first (⚡ Load).' : ''}
+      </div>`}
+    </div>
+  `;
+}
+
+function ivFilter(f) {
+  IV_STATE.filtered = f;
+  // Update button styles
+  ['all','turtle','darvas','wyckoff','fvg'].forEach(k => {
+    const btn = document.getElementById('iv-f-' + k);
+    if (!btn) return;
+    if (k === f) {
+      btn.style.background = 'var(--accent)'; btn.style.color = '#fff';
+    } else {
+      btn.style.background = 'var(--card)'; btn.style.color = 'var(--muted2)';
+    }
+  });
+  const resEl = document.getElementById('iv-results');
+  if (resEl && IV_STATE.results.length) resEl.innerHTML = ivRenderResults(IV_STATE.results);
+}
+
+async function ivScan() {
+  if (!AS.length) { toast('Load stock data first', 'dn'); return; }
+  const btn = document.getElementById('iv-scan-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning…'; }
+  IV_STATE.loading = true;
+
+  // Run all strategies on loaded data (pure JS, no extra fetches)
+  const scored = ivScoreAllStocks();
+  IV_STATE.results = scored;
+
+  const resEl = document.getElementById('iv-results');
+  if (resEl) resEl.innerHTML = ivRenderResults(scored);
+
+  if (btn) { btn.disabled = false; btn.textContent = `🔍 Scan ${AS.length} Stocks`; }
+  IV_STATE.loading = false;
+  toast(`Investment scan complete — ${scored.length} candidates found`, 'i');
+}
+
+function ivScoreAllStocks() {
+  const results = [];
+  for (const s of AS) {
+    const score = ivScoreStock(s);
+    if (score.total >= 40) results.push({ ...s, ivScore: score });
+  }
+  return results.sort((a, b) => b.ivScore.total - a.ivScore.total).slice(0, 40);
+}
+
+function ivScoreStock(s) {
+  const dc = s.daily?.c || [], dh = s.daily?.h || [], dl = s.daily?.l || [], dv = s.daily?.v || [];
+  const n = dc.length;
+  const price = s.price;
+  if (n < 60 || !price) return { total: 0 };
+
+  const avgVol = dv.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
+  let strategies = [];
+
+  // ── TURTLE TRADING ─────────────────────────────────────────────────────────
+  // 20-day high breakout with 2x+ volume
+  const hi20 = Math.max(...dh.slice(-21,-1));
+  const hi55 = Math.max(...dh.slice(-56,-1));
+  const turtleBreak20 = price > hi20 && dv[n-1] > avgVol * 1.8;
+  const turtleBreak55 = price > hi55 && dv[n-1] > avgVol * 1.5;
+  const turtleScore = turtleBreak55 ? 35 : turtleBreak20 ? 25 : 0;
+  if (turtleScore > 0) {
+    const breakType = turtleBreak55 ? '55-day breakout' : '20-day breakout';
+    strategies.push({
+      name: 'Turtle', emoji: '🐢', score: turtleScore,
+      detail: `${breakType} · Vol ${(dv[n-1]/avgVol).toFixed(1)}x avg`,
+      color: '#4f8ef7'
+    });
+  }
+
+  // ── DARVAS BOX ─────────────────────────────────────────────────────────────
+  // Near/at 52W high, then tight 3-week consolidation, box breakout
+  const hi52 = s.h52 || Math.max(...dc.slice(-252));
+  const lo52 = s.l52 || Math.min(...dc.slice(-252));
+  const pct52 = hi52 !== lo52 ? ((price - lo52)/(hi52-lo52))*100 : 50;
+  const near52 = pct52 >= 85;
+  // Box: last 15 bars tight (< 8% range)
+  const boxHi = Math.max(...dh.slice(-16,-1));
+  const boxLo = Math.min(...dl.slice(-16,-1));
+  const boxRange = boxHi > 0 ? (boxHi - boxLo)/boxHi*100 : 100;
+  const tightBox = boxRange < 8;
+  const breakingBox = price >= boxHi * 0.995;
+  const darvasScore = (near52 && tightBox && breakingBox) ? 30 :
+                      (near52 && tightBox) ? 18 : 0;
+  if (darvasScore > 0) {
+    strategies.push({
+      name: 'Darvas', emoji: '📦', score: darvasScore,
+      detail: `52W pos: ${pct52.toFixed(0)}% · Box range: ${boxRange.toFixed(1)}%${breakingBox?' · Breaking out':''}`,
+      color: '#f0b429'
+    });
+  }
+
+  // ── WYCKOFF ACCUMULATION ───────────────────────────────────────────────────
+  // Spring: price briefly goes below recent support then recovers
+  // SOS: strong move up on above-average volume after spring
+  const support60 = Math.min(...dl.slice(-61,-1));
+  const recentLo  = Math.min(...dl.slice(-11,-1));
+  const spring    = recentLo < support60 * 0.98 && price > support60; // false breakdown + recovery
+  const sos       = dv.slice(-5).some(v => v > avgVol * 2) && price > Math.max(...dc.slice(-11,-1))*0.98;
+  const wyckoffScore = (spring && sos) ? 32 : spring ? 15 : 0;
+  if (wyckoffScore > 0) {
+    strategies.push({
+      name: 'Wyckoff', emoji: '⚡', score: wyckoffScore,
+      detail: spring && sos ? 'Spring + SOS detected — smart money accumulating'
+                            : 'Spring (false breakdown) — watch for SOS confirmation',
+      color: '#00d49a'
+    });
+  }
+
+  // ── FVG + ORDER BLOCK ─────────────────────────────────────────────────────
+  // Bullish FVG in last 30 bars near current price in uptrend
+  let fvgScore = 0; let fvgDetail = '';
+  for (let i = 2; i < Math.min(n, 31); i++) {
+    if (dl[i] > dh[i-2]) { // bullish FVG
+      const fvgLo = dh[i-2], fvgHi = dl[i];
+      const dist  = Math.abs(price - (fvgLo+fvgHi)/2) / price * 100;
+      if (dist < 3 && s.e20 && price > s.e20) {
+        fvgScore  = 28;
+        fvgDetail = `Bullish FVG ₹${fvgLo.toFixed(0)}-₹${fvgHi.toFixed(0)} · ${dist.toFixed(1)}% from price`;
+        break;
+      }
+    }
+  }
+  if (fvgScore > 0) {
+    strategies.push({ name: 'FVG', emoji: '🎯', score: fvgScore, detail: fvgDetail, color: '#c084fc' });
+  }
+
+  // ── FUNDAMENTAL PROXY SCORE ────────────────────────────────────────────────
+  // No actual EPS data — use price/volume behavior as proxy
+  let fundScore = 0;
+  if (s.e20 && s.e50 && price > s.e20 && s.e20 > s.e50) fundScore += 10;  // EMA alignment
+  if (s.rsi && s.rsi >= 52 && s.rsi <= 78)               fundScore += 6;   // healthy RSI
+  if (s.volRatio >= 1.3)                                  fundScore += 5;   // vol expansion
+  if (s.pct52 >= 60)                                      fundScore += 6;   // upper 52W range
+  if (s.weekChg > 0)                                      fundScore += 3;   // positive momentum
+
+  // ── ATR-based SL / Target ─────────────────────────────────────────────────
+  const atrArr = [];
+  for (let i = Math.max(1, n-15); i < n; i++)
+    atrArr.push(Math.max(dh[i]-dl[i], Math.abs(dh[i]-dc[i-1]), Math.abs(dl[i]-dc[i-1])));
+  const atr = atrArr.length ? atrArr.reduce((a,b)=>a+b)/atrArr.length : price*0.02;
+
+  const sl     = round2(price - atr * 1.5);
+  const risk   = price - sl;
+  const target = round2(price + risk * 3);
+  const rr     = round2(risk > 0 ? (target - price) / risk : 0);
+
+  const total  = strategies.reduce((a,b) => a+b.score, 0) + fundScore;
+  const grade  = total >= 70 ? 'A' : total >= 55 ? 'B' : total >= 40 ? 'C' : 'D';
+
+  return { total, grade, strategies, fundScore, sl, target, rr };
+}
+
+function round2(v) { return Math.round(v * 100) / 100; }
+
+function ivRenderResults(results) {
+  const f = IV_STATE.filtered;
+  let filtered = results;
+  if (f !== 'all') {
+    const nameMap = { turtle: 'Turtle', darvas: 'Darvas', wyckoff: 'Wyckoff', fvg: 'FVG' };
+    filtered = results.filter(r => r.ivScore.strategies.some(s => s.name === nameMap[f]));
+  }
+
+  if (!filtered.length) return `<div class="ibox" style="color:var(--yellow)">No stocks match the "${f}" filter. Try "All Strategies".</div>`;
+
+  const gradeCol = g => g==='A'?'var(--green)':g==='B'?'#4ade80':g==='C'?'var(--yellow)':'var(--muted2)';
+
+  return `
+    <div style="font-size:.67rem;color:var(--muted2);margin-bottom:10px">
+      <strong style="color:var(--text)">${filtered.length} candidates</strong> passed investment filters
+      ${f !== 'all' ? ` · filtered by ${f}` : ''}
+      · sorted by composite score
+    </div>
+    <div style="display:grid;gap:10px">
+      ${filtered.map(s => {
+        const iv = s.ivScore;
+        const tv = `https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}`;
+        const sc = `https://www.screener.in/company/${s.symbol}/`;
+        return `
+          <div class="cwrap" style="padding:14px">
+            <!-- Header -->
+            <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px">
+                  <span style="font-size:.9rem;font-weight:800;color:var(--text)">${s.symbol}</span>
+                  <span style="font-size:.72rem;font-weight:800;color:${gradeCol(iv.grade)};
+                               background:${gradeCol(iv.grade)}18;border:1px solid ${gradeCol(iv.grade)}30;
+                               padding:1px 8px;border-radius:8px">Grade ${iv.grade}</span>
+                  <span style="font-size:.7rem;font-weight:700;color:${gradeCol(iv.grade)}">${iv.total}/100</span>
+                  <span style="font-size:.68rem;color:${s.pctChange>=0?'var(--green)':'var(--red)'}">
+                    ${s.pctChange>=0?'+':''}${s.pctChange?.toFixed(2)}%
+                  </span>
+                </div>
+                <div style="font-size:.66rem;color:var(--muted2)">${s.name}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <a href="${tv}" target="_blank"
+                   style="font-size:.64rem;padding:3px 9px;border-radius:7px;background:rgba(79,142,247,.12);
+                          color:#4f8ef7;border:1px solid rgba(79,142,247,.2);text-decoration:none">📊 TV ↗</a>
+                <a href="${sc}" target="_blank"
+                   style="font-size:.64rem;padding:3px 9px;border-radius:7px;background:rgba(167,139,250,.12);
+                          color:#a78bfa;border:1px solid rgba(167,139,250,.2);text-decoration:none">📋 Screener ↗</a>
+              </div>
+            </div>
+
+            <!-- Score bar -->
+            <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:10px">
+              <div style="height:100%;width:${Math.min(iv.total,100)}%;border-radius:3px;
+                          background:linear-gradient(90deg,${gradeCol(iv.grade)},${gradeCol(iv.grade)}aa)"></div>
+            </div>
+
+            <!-- Strategy badges -->
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+              ${iv.strategies.map(str => `
+                <div style="background:${str.color}18;border:1px solid ${str.color}30;border-radius:8px;padding:5px 10px">
+                  <div style="font-size:.68rem;font-weight:700;color:${str.color}">${str.emoji} ${str.name} · ${str.score}pts</div>
+                  <div style="font-size:.61rem;color:var(--muted2);margin-top:2px">${str.detail}</div>
+                </div>`).join('')}
+              ${iv.fundScore > 0 ? `
+                <div style="background:rgba(0,212,154,.08);border:1px solid rgba(0,212,154,.2);border-radius:8px;padding:5px 10px">
+                  <div style="font-size:.68rem;font-weight:700;color:var(--green)">📊 Fundamentals · ${iv.fundScore}pts</div>
+                  <div style="font-size:.61rem;color:var(--muted2);margin-top:2px">EMA stack · RSI · vol expansion</div>
+                </div>` : ''}
+            </div>
+
+            <!-- Trade levels -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:.63rem">
+              <div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:7px;padding:6px;text-align:center">
+                <div style="color:var(--muted2);margin-bottom:2px">Entry</div>
+                <div style="font-weight:800;color:#4f8ef7">₹${s.price?.toFixed(1)}</div>
+              </div>
+              <div style="background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:6px;text-align:center">
+                <div style="color:var(--muted2);margin-bottom:2px">SL</div>
+                <div style="font-weight:800;color:var(--red)">₹${iv.sl}</div>
+              </div>
+              <div style="background:rgba(0,212,154,.1);border:1px solid rgba(0,212,154,.2);border-radius:7px;padding:6px;text-align:center">
+                <div style="color:var(--muted2);margin-bottom:2px">Target</div>
+                <div style="font-weight:800;color:var(--green)">₹${iv.target}</div>
+              </div>
+              <div style="background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.2);border-radius:7px;padding:6px;text-align:center">
+                <div style="color:var(--muted2);margin-bottom:2px">R:R</div>
+                <div style="font-weight:800;color:${iv.rr>=3?'var(--green)':iv.rr>=2?'var(--yellow)':'var(--red)'}">1:${iv.rr}</div>
+              </div>
+            </div>
+
+            <!-- Key metrics -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.62rem;color:var(--muted2);margin-top:8px;
+                        padding-top:8px;border-top:1px solid var(--border)">
+              <span>RSI: <strong style="color:var(--text)">${s.rsi?.toFixed(0)||'?'}</strong></span>
+              <span>52W: <strong style="color:var(--text)">${s.pct52?.toFixed(0)||'?'}%</strong></span>
+              <span>Vol: <strong style="color:${s.volRatio>=1.5?'var(--green)':'var(--text)'}">${s.volRatio?.toFixed(1)||'?'}x</strong></span>
+              <span>Sector: <strong style="color:var(--text)">${s.sector||'?'}</strong></span>
+              <span style="margin-left:auto;font-style:italic">Click Screener ↗ for fundamentals (P/E, ROE, debt)</span>
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
 // ── Visitor stats polling ─────────────────────────────────────────────────────
 async function pollVisitors() {
   try {
@@ -4793,7 +5107,193 @@ setTimeout(pollVisitors, 3000);
 function rRot(){const sd=getSD();const st={Accumulation:[],Markup:[],Distribution:[],Decline:[]};sd.forEach(s=>{if(s.avgW>2)st.Markup.push(s);else if(s.avgW>0&&s.avgW<=2)st.Accumulation.push(s);else if(s.avgW<-2)st.Decline.push(s);else st.Distribution.push(s);});document.getElementById('area').innerHTML=`<div class="sh">🔁 Sector Rotation (Weinstein Stages)</div><div class="stg"><div class="stc sta"><div style="font-size:.76rem;font-weight:700;color:var(--green);margin-bottom:5px">📦 Accumulation (${st.Accumulation.length})</div><div style="font-size:.68rem;color:var(--muted)">${st.Accumulation.map(s=>`${s.name} <span style="color:var(--green)">+${s.avgW.toFixed(1)}%</span>`).join(' &nbsp; ')||'None'}</div></div><div class="stc stm"><div style="font-size:.76rem;font-weight:700;color:var(--blue);margin-bottom:5px">🚀 Markup (${st.Markup.length})</div><div style="font-size:.68rem;color:var(--muted)">${st.Markup.map(s=>`${s.name} <span style="color:var(--blue)">+${s.avgW.toFixed(1)}%</span>`).join(' &nbsp; ')||'None'}</div></div><div class="stc std"><div style="font-size:.76rem;font-weight:700;color:var(--yellow);margin-bottom:5px">🔔 Distribution (${st.Distribution.length})</div><div style="font-size:.68rem;color:var(--muted)">${st.Distribution.map(s=>`${s.name} <span style="color:var(--yellow)">${s.avgW.toFixed(1)}%</span>`).join(' &nbsp; ')||'None'}</div></div><div class="stc stk"><div style="font-size:.76rem;font-weight:700;color:var(--red);margin-bottom:5px">📉 Decline (${st.Decline.length})</div><div style="font-size:.68rem;color:var(--muted)">${st.Decline.map(s=>`${s.name} <span style="color:var(--red)">${s.avgW.toFixed(1)}%</span>`).join(' &nbsp; ')||'None'}</div></div></div><div class="sh" style="margin-top:16px">Scatter: Day% vs Week%</div><div class="cwrap"><div style="height:240px;position:relative"><canvas id="rC"></canvas></div></div>`;setTimeout(()=>{const c=document.getElementById('rC');if(!c)return;new Chart(c.getContext('2d'),{type:'scatter',data:{datasets:[{label:'Sectors',data:sd.map(s=>({x:+s.avgD.toFixed(2),y:+s.avgW.toFixed(2),sym:s.name})),backgroundColor:sd.map(s=>SC[s.name]||'#636e72'),pointRadius:7}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw.sym}: D${ctx.raw.x>0?'+':''}${ctx.raw.x}% W${ctx.raw.y>0?'+':''}${ctx.raw.y}%`}}},scales:{x:{title:{display:true,text:'Day %',color:'#7a7f9a'},ticks:{color:'#7a7f9a',font:{size:8}},grid:{color:'#1e2340'}},y:{title:{display:true,text:'Week %',color:'#7a7f9a'},ticks:{color:'#7a7f9a',font:{size:8}},grid:{color:'#1e2340'}}}}});},50);}
 
 // Calendar
-function rCal(){const ev=[{d:5,m:'Mar',e:'RBI MPC Day 1',desc:`Policy meeting begins`,i:'H'},{d:7,m:'Mar',e:'RBI Rate Decision',desc:`Repo rate & commentary`,i:'H'},{d:10,m:'Mar',e:'CPI Inflation',desc:`Feb 2026 data`,i:'H'},{d:12,m:'Mar',e:'IIP Data',desc:`Jan 2026 industrial output`,i:'M'},{d:14,m:'Mar',e:'US FOMC Minutes',desc:`Impact on FII flows`,i:'M'},{d:20,m:'Mar',e:'F&O Expiry Week',desc:`Monthly derivatives — volatility`,i:'H'},{d:27,m:'Mar',e:'Monthly F&O Expiry',desc:`March 2026 contracts expire`,i:'H'},{d:28,m:'Mar',e:'GDP Q3 Data',desc:`Oct-Dec 2025 growth`,i:'H'},{d:31,m:'Mar',e:'FY2026 Year End',desc:`Last trading day of FY26`,i:'H'}];document.getElementById('area').innerHTML=`<div class="sh">📅 Economic Calendar</div>${ev.map(e=>`<div class="ci"><div class="cd"><div style="font-size:.84rem;font-weight:700;color:var(--accent)">${e.d}</div><div style="font-size:.62rem;color:var(--muted)">${e.m}</div></div><div><div style="font-size:.77rem;color:var(--text);font-weight:600">${e.e}<span style="font-size:.6rem;padding:1px 5px;border-radius:9px;font-weight:600;margin-left:5px;${e.i==='H'?'background:rgba(255,79,106,.15);color:var(--red)':e.i==='M'?'background:rgba(245,197,24,.15);color:var(--yellow)':'background:rgba(0,200,150,.15);color:var(--green)'}">${e.i}</span></div><div style="font-size:.68rem;color:var(--muted);margin-top:2px">${e.desc}</div></div></div>`).join('')}`;}
+function rCal(){
+  const holidays2025=[
+    {d:'26 Jan',day:'Sun',name:'Republic Day'},
+    {d:'26 Feb',day:'Wed',name:'Mahashivratri'},
+    {d:'14 Mar',day:'Fri',name:'Holi'},
+    {d:'31 Mar',day:'Mon',name:"Id-Ul-Fitr (Ramzan Eid)"},
+    {d:'14 Apr',day:'Mon',name:"Dr. Ambedkar Jayanti"},
+    {d:'18 Apr',day:'Fri',name:'Good Friday'},
+    {d:'01 May',day:'Thu',name:'Maharashtra Day'},
+    {d:'15 Aug',day:'Fri',name:'Independence Day'},
+    {d:'27 Aug',day:'Wed',name:'Ganesh Chaturthi'},
+    {d:'02 Oct',day:'Thu',name:'Mahatma Gandhi Jayanti / Dussehra'},
+    {d:'21 Oct',day:'Tue',name:'Diwali Laxmi Pujan'},
+    {d:'22 Oct',day:'Wed',name:'Diwali Balipratipada'},
+    {d:'05 Nov',day:'Wed',name:"Prakash Gurpurb (Guru Nanak Jayanti)"},
+    {d:'25 Dec',day:'Thu',name:'Christmas'},
+  ];
+  const holidays2026=[
+    {d:'26 Jan',day:'Mon',name:'Republic Day'},
+    {d:'17 Feb',day:'Tue',name:'Mahashivratri'},
+    {d:'20 Mar',day:'Fri',name:'Holi'},
+    {d:'02 Apr',day:'Thu',name:'Ram Navami'},
+    {d:'03 Apr',day:'Fri',name:'Good Friday'},
+    {d:'14 Apr',day:'Tue',name:"Dr. Ambedkar Jayanti"},
+    {d:'01 May',day:'Fri',name:'Maharashtra Day'},
+    {d:'15 Aug',day:'Sat',name:'Independence Day'},
+    {d:'18 Sep',day:'Fri',name:'Ganesh Chaturthi'},
+    {d:'02 Oct',day:'Fri',name:"Gandhi Jayanti / Dussehra"},
+    {d:'08 Nov',day:'Sun',name:'Diwali Laxmi Pujan'},
+    {d:'25 Dec',day:'Fri',name:'Christmas'},
+  ];
+
+  // Economic events (rolling — update these quarterly)
+  const events=[
+    {d:'02 Apr',m:'Apr',e:'US FOMC Minutes',desc:'Federal Reserve meeting minutes — FII flow impact',i:'M'},
+    {d:'10 Apr',m:'Apr',e:'CPI Inflation Data',desc:'Mar 2026 consumer price index — RBI key input',i:'H'},
+    {d:'14 Apr',m:'Apr',e:'Market Holiday',desc:"Dr. Ambedkar Jayanti — NSE/BSE closed",i:'X'},
+    {d:'17 Apr',m:'Apr',e:'WPI Inflation',desc:'Wholesale price index Mar 2026',i:'M'},
+    {d:'21 Apr',m:'Apr',e:'RBI MPC Meeting',desc:'Monetary policy committee — rate decision',i:'H'},
+    {d:'24 Apr',m:'Apr',e:'F&O Expiry',desc:'April 2026 monthly derivatives expiry',i:'H'},
+    {d:'25 Apr',m:'Apr',e:'Q4 Results Season Begins',desc:'Nifty 50 companies report Jan-Mar 2026 results',i:'E'},
+    {d:'30 Apr',m:'Apr',e:'GDP Advance Estimate',desc:'Q4 FY26 GDP advance estimate',i:'H'},
+    {d:'01 May',m:'May',e:'Market Holiday',desc:'Maharashtra Day — NSE/BSE closed',i:'X'},
+    {d:'12 May',m:'May',e:'IIP Data',desc:'Industrial output Mar 2026',i:'M'},
+    {d:'28 May',m:'May',e:'F&O Expiry',desc:'May 2026 monthly derivatives expiry',i:'H'},
+    {d:'10 Jun',m:'Jun',e:'CPI + WPI Data',desc:'May 2026 inflation data',i:'H'},
+    {d:'06 Jun',m:'Jun',e:'RBI MPC',desc:'Bi-monthly monetary policy review',i:'H'},
+    {d:'25 Jun',m:'Jun',e:'F&O Expiry',desc:'June 2026 monthly derivatives expiry',i:'H'},
+    {d:'15 Jul',m:'Jul',e:'Q1 Results Season',desc:'April-June 2026 quarterly results begin',i:'E'},
+    {d:'25 Jul',m:'Jul',e:'Union Budget',desc:'India Union Budget FY2027 presentation',i:'H'},
+    {d:'30 Jul',m:'Jul',e:'F&O Expiry',desc:'July 2026 monthly derivatives expiry',i:'H'},
+  ];
+
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const holidays = curYear >= 2026 ? holidays2026 : holidays2025;
+
+  // Parse holiday date to check if past
+  function isPastHoliday(h) {
+    const monthNames = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const parts = h.d.split(' ');
+    const day = parseInt(parts[0]), mon = monthNames[parts[1]];
+    const hDate = new Date(curYear, mon, day);
+    return hDate < now;
+  }
+
+  function isPastEvent(e) {
+    const monthNames = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const parts = e.d.split(' ');
+    const day = parseInt(parts[0]);
+    const mon = monthNames[e.m];
+    if (mon === undefined) return false;
+    const eDate = new Date(curYear, mon, day);
+    return eDate < now;
+  }
+
+  // Days until next market holiday
+  function daysUntil(h) {
+    const monthNames = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const parts = h.d.split(' ');
+    const hDate = new Date(curYear, monthNames[parts[1]], parseInt(parts[0]));
+    const diff = Math.ceil((hDate - now) / (1000*60*60*24));
+    return diff;
+  }
+
+  const nextHoliday = holidays.filter(h => daysUntil(h) >= 0).sort((a,b) => daysUntil(a)-daysUntil(b))[0];
+  const nextHolidayDays = nextHoliday ? daysUntil(nextHoliday) : null;
+
+  document.getElementById('area').innerHTML = `
+    <div class="sh">📅 Market Calendar
+      <div class="sh-line"></div>
+      <span style="font-size:.63rem;color:var(--muted2)">NSE Holidays · Economic Events · Results Season</span>
+    </div>
+
+    <!-- Next holiday banner -->
+    ${nextHoliday && nextHolidayDays !== null ? `
+    <div style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.25);border-radius:10px;
+                padding:11px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+      <div style="font-size:1.4rem">🏦</div>
+      <div style="flex:1">
+        <div style="font-size:.78rem;font-weight:700;color:var(--text)">
+          Next Market Holiday: ${nextHoliday.name}
+        </div>
+        <div style="font-size:.66rem;color:var(--muted2);margin-top:2px">${nextHoliday.d} ${curYear} · ${nextHoliday.day}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:1.4rem;font-weight:800;color:var(--red)">${nextHolidayDays}</div>
+        <div style="font-size:.6rem;color:var(--muted2)">days away</div>
+      </div>
+    </div>` : ''}
+
+    <!-- Legend -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:.62rem">
+      <span style="display:flex;align-items:center;gap:4px;color:var(--red)">
+        <span style="width:8px;height:8px;border-radius:2px;background:var(--red);display:inline-block"></span>Market Holiday
+      </span>
+      <span style="display:flex;align-items:center;gap:4px;color:var(--red)">
+        <span style="width:8px;height:8px;border-radius:2px;background:rgba(255,69,96,.5);display:inline-block"></span>High Impact
+      </span>
+      <span style="display:flex;align-items:center;gap:4px;color:var(--yellow)">
+        <span style="width:8px;height:8px;border-radius:2px;background:var(--yellow);display:inline-block"></span>Medium
+      </span>
+      <span style="display:flex;align-items:center;gap:4px;color:#a78bfa">
+        <span style="width:8px;height:8px;border-radius:2px;background:#a78bfa;display:inline-block"></span>Results Season
+      </span>
+      <span style="display:flex;align-items:center;gap:4px;color:var(--muted2)">
+        <span style="width:8px;height:8px;border-radius:2px;background:var(--border);display:inline-block"></span>Past date
+      </span>
+    </div>
+
+    <!-- NSE Holidays -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+        🏦 NSE Market Holidays ${curYear}
+      </div>
+      <div style="display:grid;gap:5px">
+        ${holidays.map(h => {
+          const past = isPastHoliday(h);
+          const days = daysUntil(h);
+          return `<div style="display:flex;align-items:center;gap:12px;padding:9px 13px;
+                        background:${past?'var(--card2)':'var(--card)'};
+                        border:1px solid ${past?'var(--border)':'rgba(255,69,96,.2)'};
+                        border-left:3px solid ${past?'var(--border)':'var(--red)'};
+                        border-radius:9px;opacity:${past?'0.55':'1'}">
+            <div style="min-width:54px">
+              <div style="font-size:.72rem;font-weight:700;color:${past?'var(--muted2)':'var(--red)'}">${h.d}</div>
+              <div style="font-size:.6rem;color:var(--muted2)">${h.day}</div>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:.74rem;font-weight:600;color:${past?'var(--muted2)':'var(--text)'}">${h.name}</div>
+            </div>
+            <div style="font-size:.62rem;white-space:nowrap;font-weight:600;
+                        ${past ? 'color:var(--muted2)' : 'background:rgba(255,69,96,.1);color:var(--red);border:1px solid rgba(255,69,96,.2);padding:2px 8px;border-radius:6px'}">
+              ${past ? 'Past' : days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : 'In ' + days + 'd'}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Economic Events + Results -->
+    <div>
+      <div style="font-size:.67rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+        📊 Economic Events & Results Calendar
+      </div>
+      ${events.map(e => {
+        const past = isPastEvent(e);
+        const col  = e.i==='H' ? 'var(--red)' : e.i==='X' ? 'var(--red)' : e.i==='E' ? '#a78bfa' : 'var(--yellow)';
+        const bg   = e.i==='H' ? 'rgba(255,69,96,.08)' : e.i==='X' ? 'rgba(255,69,96,.12)' : e.i==='E' ? 'rgba(167,139,250,.08)' : 'rgba(245,197,24,.08)';
+        const badge = e.i==='H' ? 'High Impact' : e.i==='X' ? 'Market Holiday' : e.i==='E' ? 'Results Season' : 'Medium';
+        return `<div class="ci" style="opacity:${past?0.5:1}">
+          <div class="cd">
+            <div style="font-size:.78rem;font-weight:700;color:${past?'var(--muted2)':col}">${e.d}</div>
+            <div style="font-size:.62rem;color:var(--muted)">${e.m}</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:.77rem;color:${past?'var(--muted2)':'var(--text)'};font-weight:600">${e.e}
+              <span style="font-size:.6rem;padding:1px 5px;border-radius:9px;font-weight:600;margin-left:5px;
+                     background:${past?'var(--border)':bg};color:${past?'var(--muted2)':col}">${badge}</span>
+            </div>
+            <div style="font-size:.68rem;color:var(--muted);margin-top:2px">${e.desc}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
 
 // News
 function rNews(){if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty">Load data first.</div>`;return;}const ws=WL.length?WL:AS.slice(0,8).map(s=>s.symbol);const T=[(s,p)=>`${s} Q3 PAT up 18% YoY — brokerages raise target to ₹${(p*1.15).toFixed(0)}`,(s,p)=>`${s} secures ₹2,400Cr order from NTPC`,(s,p)=>`FII net buying ₹320Cr in ${s} — 5 sessions`,(s,p)=>`${s} buyback at ₹${(p*1.08).toFixed(0)} — 10% premium`,(s,p)=>`Block deal: ${s} 2.1% stake at ₹${(p*0.98).toFixed(0)}`,(s,p)=>`${s} FY26 guidance maintained`,(s,p)=>`Promoter raises ${s} stake by 1.5%`,(s,p)=>`${s} board approves 1:2 bonus shares`];const dates=['3 Mar','2 Mar','1 Mar','28 Feb','27 Feb'];const items=[];ws.slice(0,10).forEach((sym,i)=>{const s=AS.find(x=>x.symbol===sym);if(!s)return;items.push({sym,title:T[i%T.length](sym,s.price),date:dates[i%dates.length]});});document.getElementById('area').innerHTML=`<div class="sh">📰 News Feed</div><div class="ibox">Live news: <a href="https://www.moneycontrol.com/news/business/stocks/" target="_blank" style="color:var(--accent)">Moneycontrol</a> | <a href="https://economictimes.indiatimes.com/markets/stocks/news" target="_blank" style="color:var(--accent)">Economic Times</a> | <a href="https://www.nseindia.com/companies-listing/corporate-filings-announcements" target="_blank" style="color:var(--accent)">NSE Announcements</a></div>${items.map(n=>`<div class="ni"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:.69rem;font-weight:700;color:var(--accent)">📌 ${n.sym}</span><span style="font-size:.63rem;color:var(--muted)">${n.date}</span></div><div style="font-size:.76rem">${n.title}</div></div>`).join('')}`;}

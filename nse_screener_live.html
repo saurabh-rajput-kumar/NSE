@@ -608,6 +608,14 @@ input,select,textarea{font-size:16px!important;}
       <span class="tf-icon">🔥</span>
       <span class="tf-label"><span class="tf-name">Alpha</span><span class="tf-sub">52W Breakout</span></span>
     </div>
+    <div class="tf-tab" id="tf-brk" onclick="setTF('brk')" style="--tf-color:#a855f7">
+      <span class="tf-icon">📊</span>
+      <span class="tf-label"><span class="tf-name">Breakout</span><span class="tf-sub">D/W/M/Y</span></span>
+    </div>
+    <div class="tf-tab" id="tf-rng" onclick="setTF('rng')" style="--tf-color:#06b6d4">
+      <span class="tf-icon">↔️</span>
+      <span class="tf-label"><span class="tf-name">Ranging</span><span class="tf-sub">D/W/M/Y</span></span>
+    </div>
   </div>
   <div class="strat-row" id="strat-row">
     <!-- filled by setTF() -->
@@ -2061,13 +2069,33 @@ function hexToRGB(hex){
   return `${r},${g},${b}`;
 }
 
+// Breakout/Ranging sub-timeframe state
+let BRK_SUB = 'daily';  // daily | weekly | monthly | yearly
+let RNG_SUB = 'daily';
+
 function setTF(tf){
   ACTIVE_TF=tf;
-  // Update tab active states (only 2w, pos, alpha remain)
-  ['2w','pos','alpha'].forEach(t=>{
+  // Update tab active states
+  ['2w','pos','alpha','brk','rng'].forEach(t=>{
     const el=document.getElementById('tf-'+t);
     if(el) el.classList.toggle('active', t===tf);
   });
+
+  // Breakout mode — show D/W/M/Y sub-buttons instead of strategy cards
+  if(tf==='brk'){
+    const row=document.getElementById('strat-row');
+    if(row) row.innerHTML=brkSubRow(BRK_SUB);
+    rsBRK();
+    return;
+  }
+
+  // Ranging mode — show D/W/M/Y sub-buttons
+  if(tf==='rng'){
+    const row=document.getElementById('strat-row');
+    if(row) row.innerHTML=rngSubRow(RNG_SUB);
+    rsRNG();
+    return;
+  }
 
   const strats=getStrats(tf);
   const keys=Object.keys(strats);
@@ -2091,6 +2119,46 @@ function setTF(tf){
     }).join('');
   }
   rs();
+}
+
+// Sub-timeframe row for Breakout
+function brkSubRow(active) {
+  const tfs = [
+    {k:'daily',   label:'📈 Daily',   desc:'Last session breakout'},
+    {k:'weekly',  label:'📅 Weekly',  desc:"This week's range break"},
+    {k:'monthly', label:'🗓 Monthly', desc:'Month high/low break'},
+    {k:'yearly',  label:'🏆 Yearly',  desc:'52-week high breakout'},
+  ];
+  return `<div style="display:flex;gap:6px;padding:8px 0;flex-wrap:wrap">
+    ${tfs.map(t=>`<button
+      onclick="BRK_SUB='${t.k}';document.getElementById('strat-row').innerHTML=brkSubRow('${t.k}');rsBRK()"
+      style="padding:6px 14px;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;
+             border:1px solid ${active===t.k?'#a855f7':'var(--border2)'};
+             background:${active===t.k?'rgba(168,85,247,.2)':'var(--card2)'};
+             color:${active===t.k?'#d8b4fe':'var(--muted2)'};transition:all .15s">
+      ${t.label}<div style="font-size:.58rem;font-weight:400;opacity:.7;margin-top:1px">${t.desc}</div>
+    </button>`).join('')}
+  </div>`;
+}
+
+// Sub-timeframe row for Ranging
+function rngSubRow(active) {
+  const tfs = [
+    {k:'daily',   label:'📈 Daily',   desc:"Today's narrow range"},
+    {k:'weekly',  label:'📅 Weekly',  desc:'Week-long sideways'},
+    {k:'monthly', label:'🗓 Monthly', desc:'Month consolidation'},
+    {k:'yearly',  label:'🏆 Yearly',  desc:'Annual range bound'},
+  ];
+  return `<div style="display:flex;gap:6px;padding:8px 0;flex-wrap:wrap">
+    ${tfs.map(t=>`<button
+      onclick="RNG_SUB='${t.k}';document.getElementById('strat-row').innerHTML=rngSubRow('${t.k}');rsRNG()"
+      style="padding:6px 14px;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;
+             border:1px solid ${active===t.k?'#06b6d4':'var(--border2)'};
+             background:${active===t.k?'rgba(6,182,212,.15)':'var(--card2)'};
+             color:${active===t.k?'#67e8f9':'var(--muted2)'};transition:all .15s">
+      ${t.label}<div style="font-size:.58rem;font-weight:400;opacity:.7;margin-top:1px">${t.desc}</div>
+    </button>`).join('')}
+  </div>`;
 }
 
 function setSubStrat(k){
@@ -5085,6 +5153,408 @@ function ivRenderResults(results) {
           </div>`;
       }).join('')}
     </div>`;
+}
+
+
+// ── BREAKOUT SCREENER (rsBRK) ─────────────────────────────────────────────────
+// Detects stocks breaking out of their range on the selected timeframe
+// Daily:   close > max(high[-21:-1]) — above 20-day high, confirmed with volume
+// Weekly:  close > max(weekly closes[-5:-1]) — above prior 4 weeks high
+// Monthly: close > max(closes[-22:-1]) — above prior month high
+// Yearly:  close >= 95% of 52W high (near-new-high breakout)
+
+function rsBRK() {
+  if(CT !== 'sc') return;
+  const tf = BRK_SUB;
+  const area = document.getElementById('area');
+
+  // Score + filter stocks
+  let stocks = AS
+    .filter(s => s.daily?.c?.length >= 60 && s.mcap === 0 || s.mcap >= 800e7)
+    .map(s => {
+      const result = brkScore(s, tf);
+      return result ? { ...s, brkData: result } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.brkData.strength - a.brkData.strength);
+
+  // Stats header
+  const tfLabels = { daily:'Daily', weekly:'Weekly', monthly:'Monthly', yearly:'Yearly' };
+  const tfColor  = '#a855f7';
+
+  const stratBanner = `
+    <div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);
+                border-radius:12px;padding:13px 16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:1rem">📊</span>
+        <div style="flex:1">
+          <div style="font-size:.88rem;font-weight:800;color:var(--text)">${tfLabels[tf]} Breakout Screener</div>
+          <div style="font-size:.67rem;color:var(--muted2);margin-top:2px">
+            Stocks breaking above their ${tf} range high on volume confirmation
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.8rem;font-weight:700;color:#d8b4fe">${stocks.length} breakouts</div>
+          <div style="font-size:.62rem;color:var(--muted2)">${AS.length} scanned</div>
+        </div>
+      </div>
+    </div>`;
+
+  if (!stocks.length) {
+    area.innerHTML = stratBanner + `<div class="ibox" style="color:var(--yellow)">
+      No ${tfLabels[tf].toLowerCase()} breakouts detected. This is normal — genuine breakouts are rare.
+      Try a different timeframe or check again after market hours.
+    </div>`;
+    return;
+  }
+
+  area.innerHTML = stratBanner +
+    `<div class="srow" style="margin-bottom:14px;flex-wrap:wrap;gap:6px">
+      <div class="pill"><strong>${stocks.length}</strong> Breakouts</div>
+      <div class="pill"><strong style="color:#d8b4fe">${stocks.filter(s=>s.brkData.strength>=70).length}</strong> Strong</div>
+      <div class="pill"><strong style="color:var(--yellow)">${stocks.filter(s=>s.brkData.type==='volume_confirmed').length}</strong> Vol Confirmed</div>
+    </div>` +
+    `<div class="grid">${stocks.slice(0,40).map(s => brkCardHTML(s, tf)).join('')}</div>`;
+}
+
+function brkScore(s, tf) {
+  const dc = s.daily?.c || [], dh = s.daily?.h || [], dl = s.daily?.l || [], dv = s.daily?.v || [];
+  const n = dc.length;
+  const price = s.price;
+  if (n < 60 || !price) return null;
+
+  const avgVol = dv.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
+  const curVol = dv[n-1] || 0;
+  const volRatio = curVol / avgVol;
+
+  let rangeHigh, rangeLow, rangeLabel, barsInRange, strength = 0, type = '';
+
+  if (tf === 'daily') {
+    // Daily: broke above yesterday's high (or 5-day high for intraday significance)
+    rangeHigh = Math.max(...dh.slice(-6, -1));
+    rangeLow  = Math.min(...dl.slice(-6, -1));
+    rangeLabel = '5-day range';
+    barsInRange = 5;
+    if (price > rangeHigh) {
+      strength = 50;
+      if (volRatio >= 1.5) { strength = 70; type = 'volume_confirmed'; }
+      if (volRatio >= 2.5) { strength = 90; type = 'volume_confirmed'; }
+    }
+  } else if (tf === 'weekly') {
+    // Weekly: broke above prior 4-week high
+    rangeHigh = Math.max(...dh.slice(-22, -5));
+    rangeLow  = Math.min(...dl.slice(-22, -5));
+    rangeLabel = '4-week range';
+    barsInRange = 20;
+    const weekBreak = price > rangeHigh;
+    if (weekBreak) {
+      strength = 55;
+      if (volRatio >= 1.3) { strength = 72; type = 'volume_confirmed'; }
+      if (s.rsi && s.rsi >= 55 && s.rsi <= 80) strength += 8;
+    }
+  } else if (tf === 'monthly') {
+    // Monthly: broke above prior month's high (22 bars ago to 5 bars ago)
+    rangeHigh = Math.max(...dh.slice(-45, -22));
+    rangeLow  = Math.min(...dl.slice(-45, -22));
+    rangeLabel = 'prior month range';
+    barsInRange = 22;
+    if (price > rangeHigh) {
+      strength = 60;
+      if (volRatio >= 1.2) { strength = 75; type = 'volume_confirmed'; }
+      if (s.e20 && price > s.e20 && s.e50 && s.e20 > s.e50) strength += 10;
+    }
+  } else { // yearly
+    // Yearly: at or near 52W high (≥95%)
+    rangeHigh = s.h52 || Math.max(...dc.slice(-252));
+    rangeLow  = s.l52 || Math.min(...dc.slice(-252));
+    rangeLabel = '52-week range';
+    barsInRange = 252;
+    const pct52 = rangeHigh !== rangeLow ? ((price - rangeLow)/(rangeHigh - rangeLow))*100 : 50;
+    if (pct52 >= 95) {
+      const freshBreak = n >= 252 ? dc[n-1] >= Math.max(...dc.slice(-252,-1))*0.999 : false;
+      strength = freshBreak ? 85 : 65;
+      if (volRatio >= 1.5) { strength = Math.min(97, strength+10); type = 'volume_confirmed'; }
+      if (freshBreak) type = 'fresh_52w_' + (type || 'breakout');
+    }
+  }
+
+  if (strength === 0) return null;
+
+  // Compute ATR for SL/target
+  const atrArr = [];
+  for (let i = Math.max(1,n-14); i < n; i++)
+    atrArr.push(Math.max(dh[i]-dl[i], Math.abs(dh[i]-dc[i-1]), Math.abs(dl[i]-dc[i-1])));
+  const atr = atrArr.length ? atrArr.reduce((a,b)=>a+b)/atrArr.length : price*0.02;
+
+  const sl     = +(price - atr*1.5).toFixed(2);
+  const risk   = price - sl;
+  const target = +(price + risk*2.5).toFixed(2);
+  const rr     = risk > 0 ? +(risk*2.5/risk).toFixed(1) : 0;
+
+  return {
+    strength, type, rangeHigh:+rangeHigh.toFixed(2), rangeLow:+rangeLow.toFixed(2),
+    rangeLabel, barsInRange, volRatio:+volRatio.toFixed(2), atr:+atr.toFixed(2),
+    sl, target, rr, breakPct:+((price-rangeHigh)/rangeHigh*100).toFixed(2),
+  };
+}
+
+function brkCardHTML(s, tf) {
+  const b = s.brkData;
+  const rrData = s.rrData || { stop: b.sl, target: b.target, rr: b.rr, passes: b.rr >= 2 };
+  const tv = `https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}`;
+  const typeColor = b.strength >= 80 ? 'var(--green)' : b.strength >= 60 ? '#a855f7' : 'var(--yellow)';
+  const typeLabel = b.type.includes('fresh_52w') ? '🏆 New 52W High' :
+                    b.type === 'volume_confirmed' ? '✅ Vol Confirmed' : '📈 Breaking Out';
+
+  return `<div class="card" style="--accent-line:#a855f7">
+    <div class="ch">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          <div class="csym">${s.symbol}</div>
+          <span style="font-size:.63rem;background:rgba(168,85,247,.15);color:#d8b4fe;
+                       border:1px solid rgba(168,85,247,.3);padding:1px 7px;border-radius:8px">${typeLabel}</span>
+        </div>
+        <div class="cname">${s.name}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div style="font-size:.82rem;font-weight:800;color:${typeColor}">${b.strength}%</div>
+        <div style="font-size:.6rem;color:var(--muted2)">strength</div>
+      </div>
+    </div>
+
+    <!-- Strength bar -->
+    <div style="height:4px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:10px">
+      <div style="height:100%;width:${b.strength}%;background:linear-gradient(90deg,#a855f7,#7c3aed);border-radius:3px"></div>
+    </div>
+
+    <!-- Breakout info -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.67rem;margin-bottom:8px">
+      <span>₹<strong style="color:var(--text)">${s.price?.toFixed(1)}</strong></span>
+      <span style="color:${s.pctChange>=0?'var(--green)':'var(--red)'}">${s.pctChange>=0?'+':''}${s.pctChange?.toFixed(2)}%</span>
+      <span style="color:var(--muted2)">Broke: <strong style="color:#d8b4fe">₹${b.rangeHigh}</strong></span>
+      <span style="color:var(--muted2)">By: <strong style="color:var(--green)">+${b.breakPct}%</strong></span>
+    </div>
+    <div style="display:flex;gap:8px;font-size:.65rem;margin-bottom:10px">
+      <span style="color:var(--muted2)">Vol: <strong style="color:${b.volRatio>=1.5?'var(--green)':'var(--text)'}">${b.volRatio}x</strong></span>
+      <span style="color:var(--muted2)">RSI: <strong>${s.rsi?.toFixed(0)||'?'}</strong></span>
+      <span style="color:var(--muted2)">Range: ${b.rangeLabel}</span>
+    </div>
+
+    <!-- SL / Target -->
+    <div style="display:flex;gap:6px;font-size:.66rem;margin-bottom:8px;padding:8px 0;border-top:1px solid var(--border)">
+      <span style="color:var(--muted2)">SL: <strong style="color:var(--red)">₹${b.sl}</strong></span>
+      <span style="color:var(--muted2)">Target: <strong style="color:var(--green)">₹${b.target}</strong></span>
+      <span style="color:var(--muted2)">R:R: <strong style="color:${b.rr>=2?'var(--green)':'var(--yellow)'}">1:${b.rr}</strong></span>
+      <a href="${tv}" target="_blank" style="margin-left:auto;color:#4f8ef7;text-decoration:none;font-size:.63rem">TV ↗</a>
+    </div>
+  </div>`;
+}
+
+
+// ── RANGING SCREENER (rsRNG) ──────────────────────────────────────────────────
+// Detects stocks in a defined sideways range on the selected timeframe
+// Daily:   today's range < 1.5% AND last 5 closes within 2% band
+// Weekly:  last 5 weeks closes within 5% band
+// Monthly: last 22 daily closes within 8% band, no breakout
+// Yearly:  52W range < 30% (price action compressed for a whole year)
+
+function rsRNG() {
+  if(CT !== 'sc') return;
+  const tf = RNG_SUB;
+  const area = document.getElementById('area');
+
+  let stocks = AS
+    .filter(s => s.daily?.c?.length >= 60 && (s.mcap === 0 || s.mcap >= 800e7))
+    .map(s => {
+      const result = rngScore(s, tf);
+      return result ? { ...s, rngData: result } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.rngData.score - a.rngData.score);
+
+  const tfLabels = { daily:'Daily', weekly:'Weekly', monthly:'Monthly', yearly:'Yearly' };
+
+  const banner = `
+    <div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);
+                border-radius:12px;padding:13px 16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:1rem">↔️</span>
+        <div style="flex:1">
+          <div style="font-size:.88rem;font-weight:800;color:var(--text)">${tfLabels[tf]} Range-Bound Stocks</div>
+          <div style="font-size:.67rem;color:var(--muted2);margin-top:2px">
+            Stocks consolidating in a tight ${tf} range — potential breakout candidates
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.8rem;font-weight:700;color:#67e8f9">${stocks.length} ranging</div>
+          <div style="font-size:.62rem;color:var(--muted2)">${AS.length} scanned</div>
+        </div>
+      </div>
+    </div>`;
+
+  if (!stocks.length) {
+    area.innerHTML = banner + `<div class="ibox" style="color:var(--yellow)">
+      No strongly range-bound stocks on ${tfLabels[tf].toLowerCase()} timeframe right now.
+    </div>`;
+    return;
+  }
+
+  area.innerHTML = banner +
+    `<div class="srow" style="margin-bottom:14px;flex-wrap:wrap;gap:6px">
+      <div class="pill"><strong>${stocks.length}</strong> Ranging</div>
+      <div class="pill"><strong style="color:#67e8f9">${stocks.filter(s=>s.rngData.score>=80).length}</strong> Tight Range</div>
+      <div class="pill"><strong style="color:var(--yellow)">${stocks.filter(s=>s.rngData.nearBreak).length}</strong> Near Breakout</div>
+    </div>` +
+    `<div class="grid">${stocks.slice(0,40).map(s => rngCardHTML(s, tf)).join('')}</div>`;
+}
+
+function rngScore(s, tf) {
+  const dc = s.daily?.c || [], dh = s.daily?.h || [], dl = s.daily?.l || [], dv = s.daily?.v || [];
+  const n = dc.length;
+  const price = s.price;
+  if (n < 22 || !price) return null;
+
+  let bandHigh, bandLow, bandPct, score = 0, label = '', barsChecked;
+
+  if (tf === 'daily') {
+    // Last 5 trading days tight range
+    bandHigh = Math.max(...dh.slice(-6,-1));
+    bandLow  = Math.min(...dl.slice(-6,-1));
+    barsChecked = 5;
+    label = '5-day range';
+  } else if (tf === 'weekly') {
+    // Last 4 weeks (20 bars)
+    bandHigh = Math.max(...dh.slice(-22,-1));
+    bandLow  = Math.min(...dl.slice(-22,-1));
+    barsChecked = 20;
+    label = '4-week range';
+  } else if (tf === 'monthly') {
+    // Last 2 months (44 bars)
+    bandHigh = Math.max(...dh.slice(-45,-1));
+    bandLow  = Math.min(...dl.slice(-45,-1));
+    barsChecked = 44;
+    label = '2-month range';
+  } else { // yearly
+    bandHigh = s.h52 || Math.max(...dc.slice(-252));
+    bandLow  = s.l52 || Math.min(...dc.slice(-252));
+    barsChecked = 252;
+    label = '52-week range';
+  }
+
+  if (bandHigh <= 0) return null;
+  bandPct = (bandHigh - bandLow) / bandHigh * 100;
+
+  // Thresholds per timeframe
+  const thresholds = { daily: 3, weekly: 8, monthly: 15, yearly: 30 };
+  const threshold = thresholds[tf];
+
+  if (bandPct > threshold) return null;  // too wide to be "ranging"
+
+  // Score: tighter = higher score
+  score = Math.round(100 - (bandPct / threshold * 70));
+  score = Math.max(30, Math.min(100, score));
+
+  // Near breakout: price within top 15% of range
+  const posInRange = bandHigh > bandLow ? ((price - bandLow)/(bandHigh-bandLow))*100 : 50;
+  const nearBreak  = posInRange >= 80;  // near the top of the range
+  const nearBreakDown = posInRange <= 20;  // near the bottom
+
+  // Volume drying up (good consolidation sign)
+  const avgVol = dv.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
+  const volDrying = (dv[n-1]||0) < avgVol * 0.8;
+
+  // ATR-based SL/targets
+  const atrArr = [];
+  for (let i = Math.max(1,n-14); i < n; i++)
+    atrArr.push(Math.max(dh[i]-dl[i], Math.abs(dh[i]-dc[i-1]), Math.abs(dl[i]-dc[i-1])));
+  const atr = atrArr.length ? atrArr.reduce((a,b)=>a+b)/atrArr.length : price*0.02;
+
+  // If near breakout top: buy setup
+  // If near bottom: sell/wait setup
+  const sl     = nearBreakDown ? +(bandLow - atr*0.5).toFixed(2) : +(bandLow + atr*0.3).toFixed(2);
+  const target = +(bandHigh + (bandHigh - bandLow)).toFixed(2);  // project range above breakout
+  const risk   = price - sl;
+  const rr     = risk > 0 ? +((target - price)/risk).toFixed(1) : 0;
+
+  return {
+    score, bandHigh:+bandHigh.toFixed(2), bandLow:+bandLow.toFixed(2),
+    bandPct:+bandPct.toFixed(1), label, posInRange:+posInRange.toFixed(0),
+    nearBreak, nearBreakDown, volDrying, atr:+atr.toFixed(2),
+    sl, target, rr, barsChecked,
+  };
+}
+
+function rngCardHTML(s, tf) {
+  const r = s.rngData;
+  const tv = `https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}`;
+  const statusColor = r.nearBreak ? 'var(--green)' : r.nearBreakDown ? 'var(--red)' : '#06b6d4';
+  const statusLabel = r.nearBreak ? '🚀 Near Breakout' : r.nearBreakDown ? '⚠️ Near Breakdown' : '↔️ Mid-Range';
+
+  return `<div class="card" style="--accent-line:#06b6d4">
+    <div class="ch">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          <div class="csym">${s.symbol}</div>
+          <span style="font-size:.63rem;background:${statusColor}18;color:${statusColor};
+                       border:1px solid ${statusColor}30;padding:1px 7px;border-radius:8px">${statusLabel}</span>
+        </div>
+        <div class="cname">${s.name}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div style="font-size:.82rem;font-weight:800;color:#67e8f9">${r.bandPct}%</div>
+        <div style="font-size:.6rem;color:var(--muted2)">range width</div>
+      </div>
+    </div>
+
+    <!-- Score bar -->
+    <div style="height:4px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:8px">
+      <div style="height:100%;width:${r.score}%;background:linear-gradient(90deg,#06b6d4,#0891b2);border-radius:3px"></div>
+    </div>
+
+    <!-- Range visual bar -->
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--muted2);margin-bottom:3px">
+        <span>₹${r.bandLow}</span>
+        <span style="color:var(--accent)">▼ ₹${s.price?.toFixed(1)} (${r.posInRange}%)</span>
+        <span>₹${r.bandHigh}</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:4px;position:relative;overflow:hidden">
+        <!-- Range fill -->
+        <div style="position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(6,182,212,.15);border-radius:4px"></div>
+        <!-- Price position marker -->
+        <div style="position:absolute;top:0;bottom:0;width:3px;background:var(--accent);border-radius:2px;
+                    left:calc(${r.posInRange}% - 1px)"></div>
+        <!-- Top 20% breakout zone -->
+        <div style="position:absolute;right:0;top:0;bottom:0;width:20%;background:rgba(0,212,154,.2);border-radius:0 4px 4px 0"></div>
+      </div>
+      <div style="font-size:.58rem;color:var(--green);text-align:right;margin-top:2px">← breakout zone</div>
+    </div>
+
+    <!-- Info row -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.65rem;margin-bottom:8px;color:var(--muted2)">
+      <span>${r.label}</span>
+      <span>RSI: <strong style="color:var(--text)">${s.rsi?.toFixed(0)||'?'}</strong></span>
+      <span>Vol: <strong style="color:${r.volDrying?'var(--green)':'var(--text)'}">
+        ${r.volDrying?'🔽 Drying':'Normal'}</strong></span>
+      <span style="color:${s.pctChange>=0?'var(--green)':'var(--red)'}">${s.pctChange>=0?'+':''}${s.pctChange?.toFixed(2)}%</span>
+    </div>
+
+    <!-- If near breakout — show trade plan -->
+    ${r.nearBreak ? `
+    <div style="background:rgba(0,212,154,.07);border:1px solid rgba(0,212,154,.2);border-radius:8px;
+                padding:8px;font-size:.65rem;margin-bottom:6px">
+      <div style="color:var(--green);font-weight:700;margin-bottom:4px">🎯 Breakout Trade Plan</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;color:var(--muted2)">
+        <span>Entry: <strong style="color:var(--text)">₹${r.bandHigh} (break)</strong></span>
+        <span>SL: <strong style="color:var(--red)">₹${r.sl}</strong></span>
+        <span>Target: <strong style="color:var(--green)">₹${r.target}</strong></span>
+        <span>R:R: <strong style="color:${r.rr>=2?'var(--green)':'var(--yellow)'}">1:${r.rr}</strong></span>
+      </div>
+    </div>` : ''}
+
+    <a href="${tv}" target="_blank"
+       style="display:block;text-align:right;font-size:.63rem;color:#4f8ef7;text-decoration:none">📊 View on TV ↗</a>
+  </div>`;
 }
 
 // ── Visitor stats polling ─────────────────────────────────────────────────────

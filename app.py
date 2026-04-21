@@ -788,6 +788,22 @@ def chart():
         return jsonify({"error": "upstream failed"}), 502
     return Response(data, mimetype="application/json")
 
+@app.route("/api/chart-extended")
+def chart_extended():
+    """Fetch up to 5yr daily data for multi-year range/breakout analysis."""
+    sym   = "".join(c for c in freq.args.get("symbol","").upper()
+                    if c.isalnum() or c in "-_.%")
+    range_ = freq.args.get("range", "5y")
+    if range_ not in ("2y","3y","5y","10y","max"):
+        range_ = "5y"
+    if not sym:
+        return jsonify({"error": "missing symbol"}), 400
+    sym_ns = sym + ".NS" if not sym.endswith(".NS") else sym
+    data   = fetch_yahoo(sym_ns, interval="1d", range_=range_)
+    if not data:
+        return jsonify({"error": "upstream failed"}), 502
+    return Response(data, mimetype="application/json")
+
 @app.route("/api/health")
 def health():
     with _wa_lock:

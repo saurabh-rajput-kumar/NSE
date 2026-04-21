@@ -616,6 +616,10 @@ input,select,textarea{font-size:16px!important;}
       <span class="tf-icon">↔️</span>
       <span class="tf-label"><span class="tf-name">Ranging</span><span class="tf-sub">D/W/M/Y</span></span>
     </div>
+    <div class="tf-tab" id="tf-myr" onclick="setTF('myr')" style="--tf-color:#f59e0b">
+      <span class="tf-icon">🌋</span>
+      <span class="tf-label"><span class="tf-name">Multi-Year</span><span class="tf-sub">Breakout/Support</span></span>
+    </div>
   </div>
   <div class="strat-row" id="strat-row">
     <!-- filled by setTF() -->
@@ -2072,11 +2076,12 @@ function hexToRGB(hex){
 // Breakout/Ranging sub-timeframe state
 let BRK_SUB = 'daily';  // daily | weekly | monthly | yearly
 let RNG_SUB = 'daily';
+let MYR_SUB = 'breakout'; // breakout | support
 
 function setTF(tf){
   ACTIVE_TF=tf;
   // Update tab active states
-  ['2w','pos','alpha','brk','rng'].forEach(t=>{
+  ['2w','pos','alpha','brk','rng','myr'].forEach(t=>{
     const el=document.getElementById('tf-'+t);
     if(el) el.classList.toggle('active', t===tf);
   });
@@ -2094,6 +2099,14 @@ function setTF(tf){
     const row=document.getElementById('strat-row');
     if(row) row.innerHTML=rngSubRow(RNG_SUB);
     rsRNG();
+    return;
+  }
+
+  // Multi-Year mode — show Breakout / Near Support toggle
+  if(tf==='myr'){
+    const row=document.getElementById('strat-row');
+    if(row) row.innerHTML=myrSubRow(MYR_SUB);
+    rsMYR();
     return;
   }
 
@@ -5554,6 +5567,462 @@ function rngCardHTML(s, tf) {
 
     <a href="${tv}" target="_blank"
        style="display:block;text-align:right;font-size:.63rem;color:#4f8ef7;text-decoration:none">📊 View on TV ↗</a>
+  </div>`;
+}
+
+
+// ── MULTI-YEAR BREAKOUT / SUPPORT TAB ────────────────────────────────────────
+// Two modes:
+// 1. BREAKOUT — stock was in a multi-year range, now breaking above it
+//    Detection: 2yr high-low range < 45%, current price > 90th pctile of that range
+//    + recent volume expansion. Stocks like these give 3x–10x moves.
+// 2. SUPPORT — stock near a multi-year support level (tested 3+ times over 1+ year)
+//    Detection: price within 5% of a pivot low that appeared 3+ times across 2yr data
+//    High R:R bounce trade or critical watch level.
+
+// Cache for 5yr extended data fetches
+const MYR_CACHE = {};
+
+function myrSubRow(active) {
+  return `<div style="display:flex;gap:8px;padding:8px 0;flex-wrap:wrap">
+    <button onclick="MYR_SUB='breakout';document.getElementById('strat-row').innerHTML=myrSubRow('breakout');rsMYR()"
+      style="padding:7px 18px;border-radius:9px;font-size:.74rem;font-weight:700;cursor:pointer;
+             border:1px solid ${active==='breakout'?'#f59e0b':'var(--border2)'};
+             background:${active==='breakout'?'rgba(245,158,11,.2)':'var(--card2)'};
+             color:${active==='breakout'?'#fde68a':'var(--muted2)'};transition:all .15s">
+      🌋 Multi-Year Breakout
+      <div style="font-size:.58rem;font-weight:400;opacity:.75;margin-top:2px">Ranging years → now breaking out</div>
+    </button>
+    <button onclick="MYR_SUB='support';document.getElementById('strat-row').innerHTML=myrSubRow('support');rsMYR()"
+      style="padding:7px 18px;border-radius:9px;font-size:.74rem;font-weight:700;cursor:pointer;
+             border:1px solid ${active==='support'?'#10b981':'var(--border2)'};
+             background:${active==='support'?'rgba(16,185,129,.15)':'var(--card2)'};
+             color:${active==='support'?'#6ee7b7':'var(--muted2)'};transition:all .15s">
+      🛡️ Near Multi-Year Support
+      <div style="font-size:.58rem;font-weight:400;opacity:.75;margin-top:2px">Price close to years-old support</div>
+    </button>
+  </div>`;
+}
+
+async function rsMYR() {
+  if(CT !== 'sc') return;
+  const mode = MYR_SUB;
+  const area = document.getElementById('area');
+
+  area.innerHTML = `
+    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);
+                border-radius:12px;padding:13px 16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:1.1rem">${mode==='breakout'?'🌋':'🛡️'}</span>
+        <div style="flex:1">
+          <div style="font-size:.88rem;font-weight:800;color:var(--text)">
+            ${mode==='breakout' ? 'Multi-Year Range Breakout' : 'Near Multi-Year Support'}
+          </div>
+          <div style="font-size:.67rem;color:var(--muted2);margin-top:2px">
+            ${mode==='breakout'
+              ? 'Stocks that consolidated for years and are now breaking out — highest R:R setups in markets'
+              : 'Stocks approaching major support tested across 1–2+ years — bounce or breakdown watch'}
+          </div>
+        </div>
+        <div style="font-size:.64rem;color:var(--muted2);text-align:right">
+          Using 2yr daily data<br>from loaded universe
+        </div>
+      </div>
+    </div>
+    <div id="myr-status" style="font-size:.7rem;color:var(--muted2);margin-bottom:10px">
+      ⏳ Scanning ${AS.length} stocks for multi-year ${mode} setups…
+    </div>
+    <div id="myr-results"></div>`;
+
+  // Run analysis — uses already-loaded 2yr daily data
+  // Small delay to let the UI render first
+  await new Promise(r => setTimeout(r, 30));
+
+  const results = mode === 'breakout'
+    ? myrFindBreakouts()
+    : myrFindSupports();
+
+  const statusEl = document.getElementById('myr-status');
+  const resEl    = document.getElementById('myr-results');
+  if (!statusEl || !resEl) return;
+
+  if (!results.length) {
+    statusEl.innerHTML = '';
+    resEl.innerHTML = `<div class="ibox" style="color:var(--yellow)">
+      No multi-year ${mode} setups found in the current loaded universe.
+      ${mode==='breakout'
+        ? ' This is intentional — genuine multi-year breakouts are rare. When they appear, they are the highest-quality setups.'
+        : ' Try loading more stocks or check back when market corrects to key levels.'}
+    </div>`;
+    return;
+  }
+
+  statusEl.innerHTML = `<span style="color:var(--green)">✓</span>
+    Found <strong style="color:var(--text)">${results.length} stocks</strong>
+    · sorted by ${mode==='breakout'?'breakout strength':'proximity to support'}`;
+
+  resEl.innerHTML = `<div class="grid">${results.slice(0,40).map(s =>
+    mode==='breakout' ? myrBreakoutCard(s) : myrSupportCard(s)
+  ).join('')}</div>`;
+}
+
+// ── Multi-Year Breakout detection ─────────────────────────────────────────────
+function myrFindBreakouts() {
+  const results = [];
+
+  for (const s of AS) {
+    const dc = s.daily?.c || [], dh = s.daily?.h || [], dl = s.daily?.l || [], dv = s.daily?.v || [];
+    const n = dc.length;
+    if (n < 200 || !s.price) continue;
+    if (s.mcap > 0 && s.mcap < 800e7) continue;
+
+    // ── Step 1: Characterize the "base" (older portion of data) ───────────────
+    // Use bars[0..n-30] as the "ranging history", bars[-30..] as "recent"
+    const baseEnd   = n - 30;
+    const basePrices= dc.slice(0, baseEnd);
+    const baseHi    = Math.max(...dh.slice(0, baseEnd));
+    const baseLo    = Math.min(...dl.slice(0, baseEnd));
+    const baseRange = baseHi > 0 ? (baseHi - baseLo) / baseHi * 100 : 100;
+
+    // Was it actually in a range? Range < 45% over the base period
+    if (baseRange > 45) continue;
+
+    // ── Step 2: Is the stock NOW breaking above the base? ─────────────────────
+    const price = s.price;
+    const pctAboveBase = (price - baseHi) / baseHi * 100;
+
+    // Must be above base high (or within 2% — approaching breakout)
+    if (pctAboveBase < -2) continue;
+
+    // ── Step 3: Recency — breakout should be fresh (last 30 bars) ─────────────
+    const recentMax = Math.max(...dh.slice(-31));
+    const prevMax   = Math.max(...dh.slice(0, n-30));
+    const isFresh   = recentMax >= prevMax * 0.998;
+    if (!isFresh && pctAboveBase < 0) continue;
+
+    // ── Step 4: Volume expansion confirms breakout ────────────────────────────
+    const avgVolBase   = dv.slice(0, baseEnd).reduce((a,b)=>a+b,0) / Math.max(baseEnd,1);
+    const avgVolRecent = dv.slice(-30).reduce((a,b)=>a+b,0) / 30;
+    const volExpansion = avgVolBase > 0 ? avgVolRecent / avgVolBase : 1;
+
+    // ── Step 5: Score ─────────────────────────────────────────────────────────
+    let strength = 50;
+    if (pctAboveBase > 0)   strength += 20;   // actually above base
+    if (pctAboveBase > 3)   strength += 10;   // confirmed above
+    if (volExpansion > 1.3) strength += 12;   // volume expanding
+    if (volExpansion > 2.0) strength += 8;    // strong vol expansion
+    if (baseRange < 25)     strength += 10;   // very tight multi-yr base = rarer = better
+    if (s.rsi && s.rsi >= 55 && s.rsi <= 82) strength += 5;
+    if (s.e20 && s.e50 && s.e20 > s.e50)     strength += 5;
+
+    strength = Math.min(100, strength);
+    if (strength < 55) continue;
+
+    // ── Trade levels ──────────────────────────────────────────────────────────
+    const atrArr = [];
+    for (let i = Math.max(1,n-14); i < n; i++)
+      atrArr.push(Math.max(dh[i]-dl[i], Math.abs(dh[i]-dc[i-1]), Math.abs(dl[i]-dc[i-1])));
+    const atr = atrArr.length ? atrArr.reduce((a,b)=>a+b)/atrArr.length : price*0.015;
+
+    // SL: below the base high (re-entry into range = failed breakout)
+    const sl     = +(baseHi - atr * 0.5).toFixed(2);
+    const risk   = price - sl;
+    // Target: base range width projected above breakout (classic measured move)
+    const measuredMove = baseLo > 0 ? (baseHi - baseLo) : baseHi * 0.2;
+    const target = +(baseHi + measuredMove).toFixed(2);
+    const rr     = risk > 0 ? +((target - price) / risk).toFixed(1) : 0;
+
+    results.push({
+      ...s,
+      myrData: {
+        type: 'breakout',
+        strength,
+        baseHi: +baseHi.toFixed(2),
+        baseLo: +baseLo.toFixed(2),
+        baseRange: +baseRange.toFixed(1),
+        baseYears: +(n / 252).toFixed(1),
+        pctAboveBase: +pctAboveBase.toFixed(2),
+        volExpansion: +volExpansion.toFixed(2),
+        isFresh,
+        measuredMoveTarget: +target.toFixed(2),
+        sl, target, rr, atr: +atr.toFixed(2),
+      }
+    });
+  }
+
+  return results.sort((a,b) => b.myrData.strength - a.myrData.strength);
+}
+
+// ── Multi-Year Support detection ──────────────────────────────────────────────
+function myrFindSupports() {
+  const results = [];
+
+  for (const s of AS) {
+    const dc = s.daily?.c || [], dh = s.daily?.h || [], dl = s.daily?.l || [], dv = s.daily?.v || [];
+    const n = dc.length;
+    if (n < 150 || !s.price) continue;
+    if (s.mcap > 0 && s.mcap < 800e7) continue;
+
+    const price = s.price;
+
+    // ── Step 1: Find pivot lows (local minima across full history) ─────────────
+    const pivotLows = [];
+    const window = 10;  // larger window = more significant lows
+    for (let i = window; i < n - window; i++) {
+      const localMin = Math.min(...dl.slice(i-window, i+window+1));
+      if (dl[i] === localMin && dl[i] === Math.min(...dl.slice(i-3, i+4))) {
+        pivotLows.push({ price: dl[i], bar: i, date: '' });
+      }
+    }
+
+    if (pivotLows.length < 2) continue;
+
+    // ── Step 2: Cluster nearby pivot lows (within 4%) ─────────────────────────
+    const clusters = [];
+    const sorted   = [...pivotLows].sort((a,b) => a.price - b.price);
+    let current    = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      if ((sorted[i].price - current[0].price) / current[0].price < 0.04) {
+        current.push(sorted[i]);
+      } else {
+        clusters.push(current);
+        current = [sorted[i]];
+      }
+    }
+    clusters.push(current);
+
+    // ── Step 3: Find strong support clusters (tested 3+ times, spaced out) ────
+    for (const cluster of clusters) {
+      if (cluster.length < 2) continue;
+
+      const supportLevel = cluster.reduce((a,b) => a + b.price, 0) / cluster.length;
+      const distPct      = (price - supportLevel) / supportLevel * 100;
+
+      // Must be ABOVE support (price approaching from above = buying opportunity)
+      // OR at support (touching = critical level)
+      if (distPct < -5 || distPct > 15) continue;  // too far below or too far above
+
+      // Touches must be spread across time (not all in one week)
+      const barSpread = Math.max(...cluster.map(p=>p.bar)) - Math.min(...cluster.map(p=>p.bar));
+      if (barSpread < 40) continue;  // need at least 8 weeks between touches
+
+      // ── Score ──────────────────────────────────────────────────────────────
+      let score = 40;
+      score += Math.min(cluster.length, 5) * 8;   // more touches = stronger
+      score += barSpread >= 120 ? 15 : barSpread >= 60 ? 8 : 0;  // time-tested
+      if (distPct <= 3)  score += 20;  // very close to support
+      if (distPct <= 1)  score += 10;  // touching support
+      if (s.rsi && s.rsi < 45) score += 10;  // oversold at support = best entry
+      if (s.rsi && s.rsi < 35) score += 5;
+      score = Math.min(100, score);
+      if (score < 55) continue;
+
+      // ── Volume at current support touch ───────────────────────────────────
+      const avgVol   = dv.slice(-21,-1).reduce((a,b)=>a+b,0)/20 || 1;
+      const curVol   = dv[n-1] || 0;
+      const volSpike = curVol > avgVol * 1.5;  // volume at support = capitulation / accumulation
+
+      // ── Trade levels ──────────────────────────────────────────────────────
+      const atrArr = [];
+      for (let i = Math.max(1,n-14); i < n; i++)
+        atrArr.push(Math.max(dh[i]-dl[i], Math.abs(dh[i]-dc[i-1]), Math.abs(dl[i]-dc[i-1])));
+      const atr = atrArr.length ? atrArr.reduce((a,b)=>a+b)/atrArr.length : price*0.015;
+
+      const sl        = +(supportLevel - atr * 1.0).toFixed(2);   // just below support
+      const risk      = price - sl;
+      // Target: back to resistance or +50% of the historical range
+      const resistance = Math.max(...dh.slice(-200));
+      const target    = +(Math.min(resistance, price + risk * 3)).toFixed(2);
+      const rr        = risk > 0 ? +((target-price)/risk).toFixed(1) : 0;
+
+      results.push({
+        ...s,
+        myrData: {
+          type: 'support',
+          score,
+          supportLevel: +supportLevel.toFixed(2),
+          distPct: +distPct.toFixed(2),
+          touches: cluster.length,
+          barSpread,
+          yearsSpan: +(barSpread/252).toFixed(1),
+          volSpike,
+          volRatio: +(curVol/avgVol).toFixed(2),
+          sl, target, rr, atr: +atr.toFixed(2),
+        }
+      });
+      break; // one support level per stock (strongest)
+    }
+  }
+
+  return results.sort((a,b) => b.myrData.score - a.myrData.score);
+}
+
+// ── Card renders ──────────────────────────────────────────────────────────────
+function myrBreakoutCard(s) {
+  const m  = s.myrData;
+  const tv = `https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}`;
+  const sc = `https://www.screener.in/company/${s.symbol}/`;
+  const strengthColor = m.strength >= 80 ? 'var(--green)' : m.strength >= 65 ? '#f59e0b' : 'var(--yellow)';
+
+  return `<div class="card" style="--accent-line:#f59e0b">
+    <div class="ch">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+          <div class="csym">${s.symbol}</div>
+          <span style="font-size:.62rem;background:rgba(245,158,11,.15);color:#fde68a;
+                       border:1px solid rgba(245,158,11,.3);padding:1px 7px;border-radius:8px">
+            🌋 ${m.pctAboveBase >= 0 ? 'Breaking Out' : 'Approaching'}
+          </span>
+          ${m.isFresh ? '<span style="font-size:.6rem;background:rgba(0,212,154,.15);color:var(--green);border:1px solid rgba(0,212,154,.3);padding:1px 6px;border-radius:6px">Fresh</span>' : ''}
+        </div>
+        <div class="cname">${s.name}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.84rem;font-weight:800;color:${strengthColor}">${m.strength}%</div>
+        <div style="font-size:.59rem;color:var(--muted2)">strength</div>
+      </div>
+    </div>
+
+    <div style="height:4px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:10px">
+      <div style="height:100%;width:${m.strength}%;background:linear-gradient(90deg,#f59e0b,#d97706);border-radius:3px"></div>
+    </div>
+
+    <!-- Base info -->
+    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:8px;
+                padding:9px 11px;margin-bottom:9px">
+      <div style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;
+                  letter-spacing:.4px;margin-bottom:6px">Multi-Year Base (${m.baseYears}yr)</div>
+      <div style="display:flex;gap:10px;font-size:.67rem;flex-wrap:wrap">
+        <span>Base range: <strong style="color:var(--text)">${m.baseRange}%</strong></span>
+        <span>Base high: <strong style="color:var(--red)">₹${m.baseHi}</strong></span>
+        <span>Base low: <strong style="color:var(--muted2)">₹${m.baseLo}</strong></span>
+      </div>
+      <div style="margin-top:5px;font-size:.67rem">
+        Current: <strong style="color:${m.pctAboveBase>=0?'var(--green)':'var(--yellow)'}">
+          ₹${s.price?.toFixed(1)} (${m.pctAboveBase>=0?'+':''}${m.pctAboveBase}% ${m.pctAboveBase>=0?'above base high':'below base high'})
+        </strong>
+      </div>
+      <div style="margin-top:4px;font-size:.65rem;color:var(--muted2)">
+        Vol expansion: <strong style="color:${m.volExpansion>=1.5?'var(--green)':'var(--text)'}">${m.volExpansion}x</strong>
+        vs base avg · RSI: <strong>${s.rsi?.toFixed(0)||'?'}</strong>
+      </div>
+    </div>
+
+    <!-- Measured move -->
+    <div style="font-size:.64rem;color:var(--muted2);margin-bottom:8px">
+      📐 <strong style="color:#fde68a">Measured move target:</strong> ₹${m.measuredMoveTarget}
+      <span style="color:var(--muted2);margin-left:4px">(base range projected above breakout)</span>
+    </div>
+
+    <!-- Trade levels -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;font-size:.64rem">
+      <div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:7px;padding:7px;text-align:center">
+        <div style="color:var(--muted2);margin-bottom:2px">Entry</div>
+        <div style="font-weight:800;color:#4f8ef7">₹${s.price?.toFixed(1)}</div>
+      </div>
+      <div style="background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:7px;text-align:center">
+        <div style="color:var(--muted2);margin-bottom:2px">SL (base HI)</div>
+        <div style="font-weight:800;color:var(--red)">₹${m.sl}</div>
+      </div>
+      <div style="background:rgba(0,212,154,.1);border:1px solid rgba(0,212,154,.2);border-radius:7px;padding:7px;text-align:center">
+        <div style="color:var(--muted2);margin-bottom:2px">Target</div>
+        <div style="font-weight:800;color:var(--green)">₹${m.target}</div>
+        <div style="font-size:.58rem;color:var(--muted2)">R:R 1:${m.rr}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:6px;justify-content:flex-end">
+      <a href="${sc}" target="_blank"
+         style="font-size:.63rem;padding:3px 9px;border-radius:7px;background:rgba(167,139,250,.12);
+                color:#a78bfa;border:1px solid rgba(167,139,250,.2);text-decoration:none">📋 Screener</a>
+      <a href="${tv}" target="_blank"
+         style="font-size:.63rem;padding:3px 9px;border-radius:7px;background:rgba(79,142,247,.12);
+                color:#4f8ef7;border:1px solid rgba(79,142,247,.2);text-decoration:none">📊 TV ↗</a>
+    </div>
+  </div>`;
+}
+
+function myrSupportCard(s) {
+  const m  = s.myrData;
+  const tv = `https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}`;
+  const sc = `https://www.screener.in/company/${s.symbol}/`;
+  const urgency     = m.distPct <= 1 ? 'At Support' : m.distPct <= 3 ? 'Very Close' : 'Approaching';
+  const urgencyColor= m.distPct <= 1 ? 'var(--red)' : m.distPct <= 3 ? 'var(--yellow)' : '#10b981';
+
+  return `<div class="card" style="--accent-line:#10b981">
+    <div class="ch">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+          <div class="csym">${s.symbol}</div>
+          <span style="font-size:.62rem;background:${urgencyColor}18;color:${urgencyColor};
+                       border:1px solid ${urgencyColor}30;padding:1px 7px;border-radius:8px">
+            🛡️ ${urgency}
+          </span>
+          ${m.volSpike ? '<span style="font-size:.6rem;background:rgba(245,158,11,.15);color:#fde68a;border:1px solid rgba(245,158,11,.3);padding:1px 6px;border-radius:6px">Vol Spike</span>' : ''}
+        </div>
+        <div class="cname">${s.name}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.84rem;font-weight:800;color:${urgencyColor}">${m.score}%</div>
+        <div style="font-size:.59rem;color:var(--muted2)">support score</div>
+      </div>
+    </div>
+
+    <div style="height:4px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:10px">
+      <div style="height:100%;width:${m.score}%;background:linear-gradient(90deg,#10b981,#059669);border-radius:3px"></div>
+    </div>
+
+    <!-- Support info -->
+    <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);border-radius:8px;
+                padding:9px 11px;margin-bottom:9px">
+      <div style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;
+                  letter-spacing:.4px;margin-bottom:6px">
+        Multi-Year Support · ${m.touches} touches · ${m.yearsSpan}yr span
+      </div>
+      <div style="display:flex;gap:10px;font-size:.67rem;flex-wrap:wrap">
+        <span>Support: <strong style="color:#6ee7b7">₹${m.supportLevel}</strong></span>
+        <span>Current: <strong style="color:var(--text)">₹${s.price?.toFixed(1)}</strong></span>
+        <span>Distance: <strong style="color:${urgencyColor}">+${m.distPct}%</strong></span>
+      </div>
+      <div style="margin-top:4px;font-size:.65rem;color:var(--muted2)">
+        RSI: <strong style="color:${s.rsi&&s.rsi<40?'var(--green)':'var(--text)'}">${s.rsi?.toFixed(0)||'?'}</strong>
+        ${s.rsi && s.rsi < 40 ? '· <span style="color:var(--green)">Oversold at support — best entry</span>' : ''}
+        · Vol: <strong>${m.volRatio}x avg</strong>
+        ${m.volSpike ? '· <span style="color:#fde68a">Volume spike — capitulation or accumulation</span>' : ''}
+      </div>
+    </div>
+
+    <!-- What to do -->
+    <div style="font-size:.67rem;color:var(--muted2);margin-bottom:9px;line-height:1.6">
+      <strong style="color:var(--text)">Watch for:</strong> Bullish candle (hammer, engulfing) at ₹${m.supportLevel}.
+      If support breaks → exits. If holds → buy with SL just below ₹${m.sl}.
+    </div>
+
+    <!-- Trade levels -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;font-size:.64rem">
+      <div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:7px;padding:7px;text-align:center">
+        <div style="color:var(--muted2);margin-bottom:2px">Buy at</div>
+        <div style="font-weight:800;color:#4f8ef7">₹${m.supportLevel}</div>
+      </div>
+      <div style="background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:7px;text-align:center">
+        <div style="color:var(--muted2);margin-bottom:2px">SL (below sup)</div>
+        <div style="font-weight:800;color:var(--red)">₹${m.sl}</div>
+      </div>
+      <div style="background:rgba(0,212,154,.1);border:1px solid rgba(0,212,154,.2);border-radius:7px;padding:7px;text-align:center">
+        <div style="color:var(--muted2);margin-bottom:2px">Target</div>
+        <div style="font-weight:800;color:var(--green)">₹${m.target}</div>
+        <div style="font-size:.58rem;color:var(--muted2)">R:R 1:${m.rr}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:6px;justify-content:flex-end">
+      <a href="${sc}" target="_blank"
+         style="font-size:.63rem;padding:3px 9px;border-radius:7px;background:rgba(167,139,250,.12);
+                color:#a78bfa;border:1px solid rgba(167,139,250,.2);text-decoration:none">📋 Screener</a>
+      <a href="${tv}" target="_blank"
+         style="font-size:.63rem;padding:3px 9px;border-radius:7px;background:rgba(79,142,247,.12);
+                color:#4f8ef7;border:1px solid rgba(79,142,247,.2);text-decoration:none">📊 TV ↗</a>
+    </div>
   </div>`;
 }
 

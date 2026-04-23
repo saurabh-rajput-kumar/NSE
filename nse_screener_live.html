@@ -620,6 +620,10 @@ input,select,textarea{font-size:16px!important;}
       <span class="tf-icon">🌋</span>
       <span class="tf-label"><span class="tf-name">Multi-Year</span><span class="tf-sub">Breakout/Support</span></span>
     </div>
+    <div class="tf-tab" id="tf-pat" onclick="setTF('pat')" style="--tf-color:#e879f9">
+      <span class="tf-icon">🔷</span>
+      <span class="tf-label"><span class="tf-name">Patterns</span><span class="tf-sub">Flag·Triangle·Inside</span></span>
+    </div>
   </div>
   <div class="strat-row" id="strat-row">
     <!-- filled by setTF() -->
@@ -2077,11 +2081,12 @@ function hexToRGB(hex){
 let BRK_SUB = 'daily';  // daily | weekly | monthly | yearly
 let RNG_SUB = 'daily';
 let MYR_SUB = 'breakout'; // breakout | support
+let PAT_SUB = 'inside';    // inside | flag | asc_tri | desc_tri
 
 function setTF(tf){
   ACTIVE_TF=tf;
   // Update tab active states
-  ['2w','pos','alpha','brk','rng','myr'].forEach(t=>{
+  ['2w','pos','alpha','brk','rng','myr','pat'].forEach(t=>{
     const el=document.getElementById('tf-'+t);
     if(el) el.classList.toggle('active', t===tf);
   });
@@ -2107,6 +2112,14 @@ function setTF(tf){
     const row=document.getElementById('strat-row');
     if(row) row.innerHTML=myrSubRow(MYR_SUB);
     rsMYR();
+    return;
+  }
+
+  // Patterns mode — weekly chart patterns
+  if(tf==='pat'){
+    const row=document.getElementById('strat-row');
+    if(row) row.innerHTML=patSubRow(PAT_SUB);
+    rsPAT();
     return;
   }
 
@@ -6022,6 +6035,666 @@ function myrSupportCard(s) {
       <a href="${tv}" target="_blank"
          style="font-size:.63rem;padding:3px 9px;border-radius:7px;background:rgba(79,142,247,.12);
                 color:#4f8ef7;border:1px solid rgba(79,142,247,.2);text-decoration:none">📊 TV ↗</a>
+    </div>
+  </div>`;
+}
+
+
+// ── PATTERN SCREENER (weekly candles) ────────────────────────────────────────
+// Four patterns detected on weekly OHLC data (~100 candles from 2yr daily):
+//
+// 1. INSIDE BAR / CONSOLIDATION AFTER BIG CANDLE
+//    - Find a large bullish weekly candle (body >= 2x avg body size, close near high)
+//    - 2+ consecutive subsequent candles entirely inside that big candle's H/L range
+//    - Signal: compression / accumulation — next big move likely upward
+//
+// 2. BULL FLAG
+//    - Strong pole: 3+ consecutive rising weekly closes, total gain >= 8%
+//    - Flag: 2-5 weeks of mild pullback, closes declining but < 50% of pole gain
+//    - Range of flag weeks is tightening (decreasing high-low range)
+//    - Currently near flag upper boundary = entry point
+//
+// 3. ASCENDING TRIANGLE
+//    - Horizontal/flat resistance (top swings within 2% of each other)
+//    - Rising support (each swing low higher than the last)
+//    - At least 3 touches of resistance + 2 rising lows, span >= 6 weeks
+//    - Bullish continuation / breakout pattern
+//
+// 4. DESCENDING TRIANGLE
+//    - Flat support (bottom swings within 2% of each other)
+//    - Declining resistance (each swing high lower than the last)
+//    - At least 3 touches of support + 2 declining highs
+//    - Bearish pattern BUT at major support = high R:R reversal watch
+
+function patSubRow(active) {
+  const pats = [
+    { k:'inside',   label:'📦 Inside Bar',         desc:'Big candle → inside compression' },
+    { k:'flag',     label:'🚩 Bull Flag',           desc:'Pole + tight pullback channel'   },
+    { k:'asc_tri',  label:'📐 Ascending Triangle',  desc:'Flat top + rising lows'          },
+    { k:'desc_tri', label:'📉 Descending Triangle', desc:'Flat bottom + declining highs'   },
+  ];
+  return `<div style="display:flex;gap:6px;padding:8px 0;flex-wrap:wrap">
+    ${pats.map(p => `
+    <button onclick="PAT_SUB='${p.k}';document.getElementById('strat-row').innerHTML=patSubRow('${p.k}');rsPAT()"
+      style="padding:6px 13px;border-radius:9px;font-size:.71rem;font-weight:700;cursor:pointer;
+             border:1px solid ${active===p.k?'#e879f9':'var(--border2)'};
+             background:${active===p.k?'rgba(232,121,249,.18)':'var(--card2)'};
+             color:${active===p.k?'#f5d0fe':'var(--muted2)'};transition:all .15s">
+      ${p.label}
+      <div style="font-size:.58rem;font-weight:400;opacity:.75;margin-top:1px">${p.desc}</div>
+    </button>`).join('')}
+  </div>`;
+}
+
+function rsPAT() {
+  if(CT !== 'sc') return;
+  const mode = PAT_SUB;
+  const area = document.getElementById('area');
+
+  const modeInfo = {
+    inside:   { icon:'📦', name:'Inside Bar / Compression',  color:'#e879f9', desc:'Big bullish weekly candle followed by 2+ inside candles — coiled spring setup' },
+    flag:     { icon:'🚩', name:'Bull Flag Pattern',          color:'#f59e0b', desc:'Strong impulse (pole) followed by tight parallel pullback — continuation setup' },
+    asc_tri:  { icon:'📐', name:'Ascending Triangle',         color:'#22d3ee', desc:'Flat resistance + rising lows — buyers getting more aggressive, breakout imminent' },
+    desc_tri: { icon:'📉', name:'Descending Triangle',        color:'#f87171', desc:'Flat support + declining highs — watch for breakdown or reversal at support' },
+  };
+  const mi = modeInfo[mode];
+
+  area.innerHTML = `
+    <div style="background:${mi.color}14;border:1px solid ${mi.color}30;
+                border-radius:12px;padding:13px 16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:1.1rem">${mi.icon}</span>
+        <div style="flex:1">
+          <div style="font-size:.88rem;font-weight:800;color:var(--text)">${mi.name}</div>
+          <div style="font-size:.67rem;color:var(--muted2);margin-top:2px">${mi.desc}</div>
+        </div>
+        <div style="font-size:.64rem;color:var(--muted2);text-align:right">Weekly candles<br>~100 bars · 2yr data</div>
+      </div>
+    </div>
+    <div id="pat-status" style="font-size:.7rem;color:var(--muted2);margin-bottom:10px">
+      ⏳ Scanning ${AS.length} stocks for ${mi.name} on weekly charts…
+    </div>
+    <div id="pat-results"></div>`;
+
+  // Yield to browser paint then run
+  setTimeout(() => {
+    const results = patScan(mode);
+    const statusEl = document.getElementById('pat-status');
+    const resEl    = document.getElementById('pat-results');
+    if (!statusEl || !resEl) return;
+
+    if (!results.length) {
+      statusEl.textContent = '';
+      resEl.innerHTML = `<div class="ibox" style="color:var(--yellow)">
+        No ${mi.name} patterns found right now. Patterns require specific price structure —
+        try other pattern types or check again after more weekly candles form.
+      </div>`;
+      return;
+    }
+
+    statusEl.innerHTML = `<span style="color:var(--green)">✓</span>
+      <strong style="color:var(--text)">${results.length} stocks</strong>
+      showing ${mi.name} on weekly chart · sorted by quality score`;
+
+    resEl.innerHTML = `<div class="grid">${results.slice(0, 40).map(s => patCardHTML(s, mode, mi)).join('')}</div>`;
+  }, 40);
+}
+
+// ── Main scanner — dispatches to pattern-specific detectors ──────────────────
+function patScan(mode) {
+  const out = [];
+  for (const s of AS) {
+    if (!s.weekly || s.weekly.length < 12) continue;
+    if (s.mcap > 0 && s.mcap < 800e7) continue;
+
+    let result = null;
+    if      (mode === 'inside')   result = patDetectInside(s);
+    else if (mode === 'flag')     result = patDetectFlag(s);
+    else if (mode === 'asc_tri')  result = patDetectAscTri(s);
+    else if (mode === 'desc_tri') result = patDetectDescTri(s);
+
+    if (result && result.score >= 50) out.push({ ...s, patData: result });
+  }
+  return out.sort((a, b) => b.patData.score - a.patData.score);
+}
+
+// ── 1. Inside Bar / Compression ───────────────────────────────────────────────
+function patDetectInside(s) {
+  const wk = s.weekly;
+  const n  = wk.length;
+  if (n < 8) return null;
+
+  // Compute avg body size over last 20 weekly candles
+  const recent20 = wk.slice(-20);
+  const avgBody  = recent20.reduce((a, b) => a + Math.abs(b.c - b.o), 0) / recent20.length;
+
+  // Scan last 15 weekly candles for a "mother bar" (big bullish)
+  for (let i = n - 15; i < n - 2; i++) {
+    const mb     = wk[i];
+    const mbBody = mb.c - mb.o;       // positive = bullish
+    const mbRange= mb.h - mb.l;
+
+    // Mother bar must be: bullish, large body (>= 1.8x avg), close in upper 30% of range
+    if (mbBody < avgBody * 1.8)    continue;
+    if (mbBody < 0)                continue;
+    if (mbRange <= 0)              continue;
+    const closePos = (mb.c - mb.l) / mbRange;
+    if (closePos < 0.60)           continue;
+
+    // Count consecutive inside bars after mother bar
+    let insideCount = 0;
+    for (let j = i + 1; j < n; j++) {
+      const bar = wk[j];
+      if (bar.h <= mb.h && bar.l >= mb.l) {
+        insideCount++;
+      } else {
+        break;  // inside bar sequence broken
+      }
+    }
+
+    if (insideCount < 1) continue;  // need at least 1 inside bar
+
+    // How many bars ago was the mother bar
+    const barsAgo = n - 1 - i;
+
+    // Score: more inside bars = better compression, recent = better
+    let score = 50;
+    score += Math.min(insideCount, 4) * 10;   // up to +40 for 4+ inside bars
+    score += barsAgo <= 4 ? 15 : barsAgo <= 8 ? 8 : 0;
+    if (s.rsi && s.rsi > 50 && s.rsi < 75) score += 8;
+    if (s.e20 && s.price > s.e20)           score += 7;
+    score = Math.min(100, score);
+
+    // ATR-based levels
+    const atr = patATR(s.daily?.h||[], s.daily?.l||[], s.daily?.c||[], 14);
+
+    return {
+      pattern: 'inside',
+      score,
+      insideCount,
+      barsAgo,
+      motherBar:  { o: +mb.o.toFixed(2), h: +mb.h.toFixed(2), l: +mb.l.toFixed(2), c: +mb.c.toFixed(2) },
+      entry:      +mb.h.toFixed(2),           // buy on break of mother bar high
+      sl:         +(mb.l - atr * 0.3).toFixed(2),  // below mother bar low
+      target:     +(mb.h + (mb.h - mb.l) * 1.2).toFixed(2), // 1.2x mother bar range above
+      detail:     `${insideCount} inside bar${insideCount>1?'s':''} after big ${((mb.c-mb.o)/mb.o*100).toFixed(1)}% weekly candle (${barsAgo}wk ago)`,
+    };
+  }
+  return null;
+}
+
+// ── 2. Bull Flag ──────────────────────────────────────────────────────────────
+function patDetectFlag(s) {
+  const wk = s.weekly;
+  const n  = wk.length;
+  if (n < 10) return null;
+
+  // Scan for pole: 3-6 consecutive rising closes, total gain >= 8%
+  for (let poleStart = n - 20; poleStart < n - 5; poleStart++) {
+    if (poleStart < 0) continue;
+
+    // Try pole lengths 3–6 weeks
+    for (let poleLen = 3; poleLen <= 6; poleLen++) {
+      const poleEnd = poleStart + poleLen - 1;
+      if (poleEnd >= n - 2) continue;
+
+      // All candles in pole must be rising closes
+      let poleOk = true;
+      for (let k = poleStart + 1; k <= poleEnd; k++) {
+        if (wk[k].c <= wk[k-1].c) { poleOk = false; break; }
+      }
+      if (!poleOk) continue;
+
+      const poleGain = (wk[poleEnd].c - wk[poleStart].o) / wk[poleStart].o * 100;
+      if (poleGain < 8) continue;
+
+      const poleHigh = Math.max(...wk.slice(poleStart, poleEnd+1).map(b=>b.h));
+      const poleLow  = wk[poleStart].l;
+
+      // Flag: 2–5 weeks after pole, mild decline
+      const flagStart = poleEnd + 1;
+      const flagMaxEnd = Math.min(flagStart + 5, n - 1);
+
+      for (let flagEnd = flagStart + 1; flagEnd <= flagMaxEnd; flagEnd++) {
+        const flagBars = wk.slice(flagStart, flagEnd + 1);
+        const flagLen  = flagBars.length;
+        if (flagLen < 2) continue;
+
+        // Flag closes should be gently declining (not collapsing)
+        const flagDrop = (flagBars[0].c - flagBars[flagLen-1].c) / flagBars[0].c * 100;
+        if (flagDrop < 0 || flagDrop > poleGain * 0.5) continue;  // 0–50% retrace of pole
+
+        // Flag range should be tightening or at least < 40% of pole range
+        const flagHi  = Math.max(...flagBars.map(b=>b.h));
+        const flagLo  = Math.min(...flagBars.map(b=>b.l));
+        const flagRng = flagHi > 0 ? (flagHi-flagLo)/flagHi*100 : 100;
+        const poleRng = poleHigh > 0 ? (poleHigh-poleLow)/poleHigh*100 : 100;
+        if (flagRng > poleRng * 0.45) continue;  // flag must be tight vs pole
+
+        // Current price should be near the flag (within last 3 bars of flag)
+        const barsAgo = n - 1 - flagEnd;
+        if (barsAgo > 3) continue;  // stale pattern
+
+        let score = 55;
+        score += poleGain >= 15 ? 15 : poleGain >= 10 ? 8 : 0;
+        score += flagLen <= 3 ? 12 : flagLen <= 4 ? 6 : 0;
+        score += barsAgo === 0 ? 15 : barsAgo === 1 ? 8 : 3;
+        if (s.rsi && s.rsi > 50 && s.rsi < 72) score += 8;
+        score = Math.min(100, score);
+
+        const atr = patATR(s.daily?.h||[], s.daily?.l||[], s.daily?.c||[], 14);
+        return {
+          pattern:   'flag',
+          score,
+          poleGain:  +poleGain.toFixed(1),
+          poleLen,
+          flagLen,
+          flagDrop:  +flagDrop.toFixed(1),
+          barsAgo,
+          entry:     +poleHigh.toFixed(2),        // buy on break of pole high
+          sl:        +(flagLo - atr * 0.3).toFixed(2),
+          target:    +(poleHigh + (poleHigh - poleLow) * 0.8).toFixed(2),  // 80% of pole projected
+          detail:    `${poleLen}wk pole (+${poleGain.toFixed(1)}%) → ${flagLen}wk flag (−${flagDrop.toFixed(1)}%)`,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+// ── 3. Ascending Triangle ─────────────────────────────────────────────────────
+function patDetectAscTri(s) {
+  const wk = s.weekly;
+  const n  = wk.length;
+  if (n < 10) return null;
+
+  // Use last 20 weekly bars
+  const bars  = wk.slice(-20);
+  const bn    = bars.length;
+
+  // Find swing highs and swing lows (local extremes, window=2)
+  const swingH = [], swingL = [];
+  for (let i = 2; i < bn - 2; i++) {
+    if (bars[i].h >= bars[i-1].h && bars[i].h >= bars[i-2].h &&
+        bars[i].h >= bars[i+1].h && bars[i].h >= bars[i+2].h)
+      swingH.push({ val: bars[i].h, idx: i });
+    if (bars[i].l <= bars[i-1].l && bars[i].l <= bars[i-2].l &&
+        bars[i].l <= bars[i+1].l && bars[i].l <= bars[i+2].l)
+      swingL.push({ val: bars[i].l, idx: i });
+  }
+
+  if (swingH.length < 2 || swingL.length < 2) return null;
+
+  // Flat top: swing highs within 2.5% of each other
+  const maxH  = Math.max(...swingH.map(h=>h.val));
+  const minH  = Math.min(...swingH.map(h=>h.val));
+  const hSprd = maxH > 0 ? (maxH - minH) / maxH * 100 : 100;
+  if (hSprd > 2.5) return null;
+  const resistance = (maxH + minH) / 2;
+
+  // Rising lows: each swing low higher than the previous
+  let risingLows = true;
+  for (let i = 1; i < swingL.length; i++) {
+    if (swingL[i].val <= swingL[i-1].val) { risingLows = false; break; }
+  }
+  if (!risingLows) return null;
+
+  // Span at least 6 weeks
+  const span = swingH[swingH.length-1].idx - Math.min(swingH[0].idx, swingL[0].idx);
+  if (span < 6) return null;
+
+  // Price near resistance (within 3%) = approaching breakout
+  const price    = s.price || bars[bn-1].c;
+  const distPct  = (resistance - price) / resistance * 100;
+  if (distPct < 0 || distPct > 8) return null;  // already broke out or too far
+
+  let score = 55;
+  score += swingH.length >= 3 ? 15 : 8;
+  score += swingL.length >= 3 ? 10 : 5;
+  score += distPct <= 1.5 ? 18 : distPct <= 3 ? 10 : 4;
+  score += span >= 12 ? 10 : span >= 8 ? 5 : 0;
+  if (s.rsi && s.rsi > 50 && s.rsi < 72) score += 7;
+  score = Math.min(100, score);
+
+  const atr    = patATR(s.daily?.h||[], s.daily?.l||[], s.daily?.c||[], 14);
+  const triHgt = resistance - swingL[swingL.length-1].val;
+  return {
+    pattern:    'asc_tri',
+    score,
+    resistance: +resistance.toFixed(2),
+    lastLow:    +swingL[swingL.length-1].val.toFixed(2),
+    distPct:    +distPct.toFixed(2),
+    touchesH:   swingH.length,
+    touchesL:   swingL.length,
+    spanWeeks:  span,
+    entry:      +(resistance * 1.005).toFixed(2),   // just above resistance
+    sl:         +(swingL[swingL.length-1].val - atr*0.3).toFixed(2),
+    target:     +(resistance + triHgt).toFixed(2),  // triangle height projected
+    detail:     `${swingH.length} resistance touches · ${swingL.length} rising lows · ${span}wk span · ${distPct.toFixed(1)}% from breakout`,
+  };
+}
+
+// ── 4. Descending Triangle ────────────────────────────────────────────────────
+function patDetectDescTri(s) {
+  const wk = s.weekly;
+  const n  = wk.length;
+  if (n < 10) return null;
+
+  const bars  = wk.slice(-20);
+  const bn    = bars.length;
+
+  const swingH = [], swingL = [];
+  for (let i = 2; i < bn - 2; i++) {
+    if (bars[i].h >= bars[i-1].h && bars[i].h >= bars[i-2].h &&
+        bars[i].h >= bars[i+1].h && bars[i].h >= bars[i+2].h)
+      swingH.push({ val: bars[i].h, idx: i });
+    if (bars[i].l <= bars[i-1].l && bars[i].l <= bars[i-2].l &&
+        bars[i].l <= bars[i+1].l && bars[i].l <= bars[i+2].l)
+      swingL.push({ val: bars[i].l, idx: i });
+  }
+
+  if (swingH.length < 2 || swingL.length < 2) return null;
+
+  // Flat bottom: swing lows within 2.5% of each other
+  const maxL  = Math.max(...swingL.map(l=>l.val));
+  const minL  = Math.min(...swingL.map(l=>l.val));
+  const lSprd = maxL > 0 ? (maxL - minL) / maxL * 100 : 100;
+  if (lSprd > 2.5) return null;
+  const support = (maxL + minL) / 2;
+
+  // Declining highs: each swing high lower than the previous
+  let decliningHighs = true;
+  for (let i = 1; i < swingH.length; i++) {
+    if (swingH[i].val >= swingH[i-1].val) { decliningHighs = false; break; }
+  }
+  if (!decliningHighs) return null;
+
+  const span   = swingL[swingL.length-1].idx - Math.min(swingH[0].idx, swingL[0].idx);
+  if (span < 6) return null;
+
+  const price   = s.price || bars[bn-1].c;
+  const distPct = (price - support) / support * 100;
+  if (distPct < 0 || distPct > 8) return null;
+
+  let score = 50;
+  score += swingL.length >= 3 ? 15 : 8;
+  score += swingH.length >= 3 ? 10 : 5;
+  score += distPct <= 1.5 ? 18 : distPct <= 3 ? 10 : 4;
+  score += span >= 12 ? 10 : span >= 8 ? 5 : 0;
+  if (s.rsi && s.rsi < 45) score += 10;  // oversold at flat support = reversal watch
+  score = Math.min(100, score);
+
+  const atr    = patATR(s.daily?.h||[], s.daily?.l||[], s.daily?.c||[], 14);
+  const triHgt = swingH[0].val - support;
+  return {
+    pattern:    'desc_tri',
+    score,
+    support:    +support.toFixed(2),
+    lastHigh:   +swingH[swingH.length-1].val.toFixed(2),
+    distPct:    +distPct.toFixed(2),
+    touchesH:   swingH.length,
+    touchesL:   swingL.length,
+    spanWeeks:  span,
+    // Two scenarios: bounce off support (bullish) or breakdown (bearish)
+    entryBull:  +support.toFixed(2),
+    entryBear:  +(support * 0.995).toFixed(2),
+    sl:         +(support - atr).toFixed(2),
+    targetBull: +(support + triHgt * 0.7).toFixed(2),
+    targetBear: +(support - triHgt).toFixed(2),
+    detail:     `${swingL.length} support touches · ${swingH.length} declining highs · ${span}wk span · ${distPct.toFixed(1)}% from support`,
+  };
+}
+
+// ── Shared ATR helper ─────────────────────────────────────────────────────────
+function patATR(hs, ls, cs, period) {
+  const n = cs.length;
+  if (n < period + 1) return (cs[n-1] || 0) * 0.015;
+  let sum = 0;
+  for (let i = n - period; i < n; i++) {
+    sum += Math.max(
+      hs[i] - ls[i],
+      Math.abs(hs[i] - cs[i-1]),
+      Math.abs(ls[i] - cs[i-1])
+    );
+  }
+  return sum / period;
+}
+
+// ── Card renderer ─────────────────────────────────────────────────────────────
+function patCardHTML(s, mode, mi) {
+  const p   = s.patData;
+  const tv  = `https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}`;
+  const sc  = `https://www.screener.in/company/${s.symbol}/`;
+  const col = mi.color;
+  const scoreColor = p.score >= 80 ? 'var(--green)' : p.score >= 65 ? col : 'var(--yellow)';
+
+  // Build pattern-specific visual
+  let patVisual = '';
+  let tradeSection = '';
+
+  if (mode === 'inside') {
+    const mb = p.motherBar;
+    const barWidthPct = 60;
+    patVisual = `
+      <div style="background:${col}0d;border:1px solid ${col}20;border-radius:8px;padding:9px 11px;margin-bottom:9px">
+        <div style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">
+          Pattern · ${p.insideCount} inside bar${p.insideCount>1?'s':''} · ${p.barsAgo}wk ago
+        </div>
+        <!-- Mini candlestick visual -->
+        <div style="display:flex;align-items:flex-end;gap:4px;height:36px;margin-bottom:6px">
+          <!-- Mother bar (big green) -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex:0 0 18px">
+            <div style="width:2px;height:4px;background:var(--green)"></div>
+            <div style="width:12px;height:22px;background:var(--green);border-radius:2px"></div>
+            <div style="width:2px;height:4px;background:var(--green)"></div>
+          </div>
+          <!-- Inside bars (smaller, grey) -->
+          ${Array(Math.min(p.insideCount, 4)).fill(0).map((_, i) => `
+          <div style="display:flex;flex-direction:column;align-items:center;flex:0 0 14px">
+            <div style="width:2px;height:3px;background:var(--muted2)"></div>
+            <div style="width:10px;height:${14-i*2}px;background:var(--muted2);border-radius:2px;opacity:${0.8-i*0.15}"></div>
+            <div style="width:2px;height:3px;background:var(--muted2)"></div>
+          </div>`).join('')}
+          <!-- Arrow -->
+          <div style="font-size:.9rem;color:${col};padding-bottom:8px">→</div>
+          <!-- Potential breakout candle -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex:0 0 14px;opacity:.4">
+            <div style="width:2px;height:5px;background:${col}"></div>
+            <div style="width:10px;height:18px;background:${col};border-radius:2px"></div>
+            <div style="width:2px;height:3px;background:${col}"></div>
+          </div>
+        </div>
+        <div style="font-size:.66rem;color:var(--muted2)">${p.detail}</div>
+      </div>`;
+    tradeSection = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;font-size:.63rem">
+        <div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:7px;padding:7px;text-align:center">
+          <div style="color:var(--muted2);margin-bottom:2px">Entry (break)</div>
+          <div style="font-weight:800;color:#4f8ef7">₹${p.entry}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">above mother bar</div>
+        </div>
+        <div style="background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:7px;text-align:center">
+          <div style="color:var(--muted2);margin-bottom:2px">SL</div>
+          <div style="font-weight:800;color:var(--red)">₹${p.sl}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">below mother low</div>
+        </div>
+        <div style="background:rgba(0,212,154,.1);border:1px solid rgba(0,212,154,.2);border-radius:7px;padding:7px;text-align:center">
+          <div style="color:var(--muted2);margin-bottom:2px">Target</div>
+          <div style="font-weight:800;color:var(--green)">₹${p.target}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">1.2x range proj</div>
+        </div>
+      </div>`;
+  }
+
+  else if (mode === 'flag') {
+    patVisual = `
+      <div style="background:${col}0d;border:1px solid ${col}20;border-radius:8px;padding:9px 11px;margin-bottom:9px">
+        <div style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">
+          Bull Flag · ${p.detail}
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:2px;height:34px;margin-bottom:6px">
+          <!-- Pole: rising candles -->
+          ${Array(p.poleLen).fill(0).map((_, i) => `
+            <div style="flex:0 0 10px;background:var(--green);border-radius:1px;
+                        height:${16 + i*4}px;opacity:${0.6+i*0.08}"></div>`).join('')}
+          <!-- Flag: gently declining candles -->
+          ${Array(p.flagLen).fill(0).map((_, i) => `
+            <div style="flex:0 0 10px;background:#f59e0b;border-radius:1px;
+                        height:${20 - i*2}px;opacity:${0.8-i*0.1}"></div>`).join('')}
+          <div style="font-size:.8rem;color:${col};padding-bottom:4px;margin-left:2px">↗</div>
+        </div>
+        <div style="display:flex;gap:8px;font-size:.64rem">
+          <span>Pole: <strong style="color:var(--green)">+${p.poleGain}%</strong></span>
+          <span>Flag drop: <strong style="color:#f59e0b">−${p.flagDrop}%</strong></span>
+          <span>Current: <strong style="color:${p.barsAgo===0?col:'var(--muted2)'}">
+            ${p.barsAgo===0?'In flag now':`${p.barsAgo}wk ago`}</strong></span>
+        </div>
+      </div>`;
+    tradeSection = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;font-size:.63rem">
+        <div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:7px;padding:7px;text-align:center">
+          <div style="color:var(--muted2);margin-bottom:2px">Entry (break)</div>
+          <div style="font-weight:800;color:#4f8ef7">₹${p.entry}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">above pole high</div>
+        </div>
+        <div style="background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:7px;text-align:center">
+          <div style="color:var(--muted2);margin-bottom:2px">SL</div>
+          <div style="font-weight:800;color:var(--red)">₹${p.sl}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">below flag low</div>
+        </div>
+        <div style="background:rgba(0,212,154,.1);border:1px solid rgba(0,212,154,.2);border-radius:7px;padding:7px;text-align:center">
+          <div style="color:var(--muted2);margin-bottom:2px">Target</div>
+          <div style="font-weight:800;color:var(--green)">₹${p.target}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">80% pole proj</div>
+        </div>
+      </div>`;
+  }
+
+  else if (mode === 'asc_tri') {
+    patVisual = `
+      <div style="background:${col}0d;border:1px solid ${col}20;border-radius:8px;padding:9px 11px;margin-bottom:9px">
+        <div style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">
+          Ascending Triangle · ${p.detail}
+        </div>
+        <!-- Triangle visual -->
+        <div style="position:relative;height:36px;margin-bottom:6px">
+          <div style="position:absolute;top:2px;left:0;right:40px;height:2px;background:var(--red);opacity:.6;border-radius:1px"></div>
+          <div style="position:absolute;bottom:2px;left:0;width:30%;height:2px;background:var(--green);opacity:.4;border-radius:1px"></div>
+          <div style="position:absolute;bottom:0;left:30%;right:40px;height:2px;background:var(--green);opacity:.7;
+                      transform:rotate(-2deg);transform-origin:left center;border-radius:1px"></div>
+          <div style="position:absolute;top:2px;right:30px;font-size:.8rem;color:${col}">→</div>
+          <div style="position:absolute;top:2px;right:0;font-size:.62rem;color:var(--red)">R</div>
+          <div style="position:absolute;bottom:0;left:0;font-size:.62rem;color:var(--green)">S↑</div>
+        </div>
+        <div style="display:flex;gap:8px;font-size:.64rem">
+          <span>Resistance: <strong style="color:var(--red)">₹${p.resistance}</strong></span>
+          <span>Last low: <strong style="color:var(--green)">₹${p.lastLow}</strong></span>
+          <span>Gap: <strong style="color:${p.distPct<2?col:'var(--yellow)'}">${p.distPct}%</strong></span>
+        </div>
+      </div>`;
+    tradeSection = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;font-size:.63rem">
+        <div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:7px;padding:7px;text-align:center">
+          <div style="color:var(--muted2);margin-bottom:2px">Entry (above R)</div>
+          <div style="font-weight:800;color:#4f8ef7">₹${p.entry}</div>
+        </div>
+        <div style="background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:7px;text-align:center">
+          <div style="color:var(--muted2);margin-bottom:2px">SL</div>
+          <div style="font-weight:800;color:var(--red)">₹${p.sl}</div>
+        </div>
+        <div style="background:rgba(0,212,154,.1);border:1px solid rgba(0,212,154,.2);border-radius:7px;padding:7px;text-align:center">
+          <div style="color:var(--muted2);margin-bottom:2px">Target</div>
+          <div style="font-weight:800;color:var(--green)">₹${p.target}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">height projected</div>
+        </div>
+      </div>`;
+  }
+
+  else { // desc_tri
+    patVisual = `
+      <div style="background:${col}0d;border:1px solid ${col}20;border-radius:8px;padding:9px 11px;margin-bottom:9px">
+        <div style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">
+          Descending Triangle · ${p.detail}
+        </div>
+        <div style="position:relative;height:36px;margin-bottom:6px">
+          <div style="position:absolute;top:2px;left:0;width:30%;height:2px;background:var(--red);opacity:.7;border-radius:1px"></div>
+          <div style="position:absolute;top:2px;left:30%;right:40px;height:2px;background:var(--red);opacity:.4;
+                      transform:rotate(2deg);transform-origin:left center;border-radius:1px"></div>
+          <div style="position:absolute;bottom:2px;left:0;right:40px;height:2px;background:var(--green);opacity:.6;border-radius:1px"></div>
+          <div style="position:absolute;bottom:2px;right:30px;font-size:.8rem;color:var(--yellow)">?</div>
+          <div style="position:absolute;top:0;left:0;font-size:.62rem;color:var(--red)">R↓</div>
+          <div style="position:absolute;bottom:0;left:0;font-size:.62rem;color:var(--green)">S</div>
+        </div>
+        <div style="display:flex;gap:8px;font-size:.64rem;flex-wrap:wrap">
+          <span>Support: <strong style="color:var(--green)">₹${p.support}</strong></span>
+          <span>Last high: <strong style="color:var(--red)">₹${p.lastHigh}</strong></span>
+          <span style="color:var(--muted2)">RSI: <strong>${s.rsi?.toFixed(0)||'?'}</strong></span>
+        </div>
+      </div>
+      <div style="font-size:.64rem;color:var(--muted2);margin-bottom:8px;line-height:1.6">
+        <strong style="color:var(--yellow)">Watch both ways:</strong>
+        Bounce off ₹${p.support} → target ₹${p.targetBull} ·
+        Break below → target ₹${p.targetBear}
+      </div>`;
+    tradeSection = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px;font-size:.63rem">
+        <div style="background:rgba(0,212,154,.1);border:1px solid rgba(0,212,154,.2);border-radius:7px;padding:7px">
+          <div style="color:var(--green);font-weight:700;margin-bottom:3px">📈 If bounces</div>
+          <div>Entry: <strong style="color:var(--text)">₹${p.entryBull}</strong></div>
+          <div>Target: <strong style="color:var(--green)">₹${p.targetBull}</strong></div>
+          <div>SL: <strong style="color:var(--red)">₹${p.sl}</strong></div>
+        </div>
+        <div style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:7px">
+          <div style="color:var(--red);font-weight:700;margin-bottom:3px">📉 If breaks down</div>
+          <div>Entry: <strong style="color:var(--text)">₹${p.entryBear}</strong></div>
+          <div>Target: <strong style="color:var(--red)">₹${p.targetBear}</strong></div>
+          <div>SL: <strong style="color:var(--muted2)">₹${p.support}</strong></div>
+        </div>
+      </div>`;
+  }
+
+  const rr = p.sl && p.target && s.price
+    ? +((p.target - s.price) / (s.price - p.sl)).toFixed(1)
+    : (p.rr || '?');
+
+  return `<div class="card" style="--accent-line:${col}">
+    <div class="ch">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+          <div class="csym">${s.symbol}</div>
+          <span style="font-size:.62rem;background:${col}18;color:${col};
+                       border:1px solid ${col}30;padding:1px 7px;border-radius:8px">${mi.icon} ${mi.name}</span>
+        </div>
+        <div class="cname">${s.name}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.84rem;font-weight:800;color:${scoreColor}">${p.score}</div>
+        <div style="font-size:.59rem;color:var(--muted2)">quality</div>
+      </div>
+    </div>
+
+    <!-- Score bar -->
+    <div style="height:4px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:10px">
+      <div style="height:100%;width:${p.score}%;background:${col};border-radius:3px;opacity:.8"></div>
+    </div>
+
+    <!-- Pattern-specific visual + trade plan -->
+    ${patVisual}
+    ${tradeSection}
+
+    <!-- Bottom row -->
+    <div style="display:flex;align-items:center;gap:8px;font-size:.62rem;color:var(--muted2);
+                border-top:1px solid var(--border);padding-top:7px">
+      <span>₹${s.price?.toFixed(1)}</span>
+      <span style="color:${s.pctChange>=0?'var(--green)':'var(--red)'}">
+        ${s.pctChange>=0?'+':''}${s.pctChange?.toFixed(2)}%</span>
+      <span>RSI ${s.rsi?.toFixed(0)||'?'}</span>
+      <span>R:R <strong style="color:${parseFloat(rr)>=2?'var(--green)':'var(--yellow)'}">1:${rr}</strong></span>
+      <span style="margin-left:auto;display:flex;gap:5px">
+        <a href="https://www.screener.in/company/${s.symbol}/" target="_blank"
+           style="color:#a78bfa;text-decoration:none">Screener</a>
+        <a href="${tv}" target="_blank" style="color:#4f8ef7;text-decoration:none">TV ↗</a>
+      </span>
     </div>
   </div>`;
 }

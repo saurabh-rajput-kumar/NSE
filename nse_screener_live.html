@@ -6072,6 +6072,7 @@ function patSubRow(active) {
     { k:'flag',     label:'🚩 Bull Flag',           desc:'Pole + tight pullback channel'   },
     { k:'asc_tri',  label:'📐 Ascending Triangle',  desc:'Flat top + rising lows'          },
     { k:'desc_tri', label:'📉 Descending Triangle', desc:'Flat bottom + declining highs'   },
+    { k:'sym_tri',  label:'🔺 Symmetrical Triangle',  desc:'Converging highs + lows (coiled)' },
   ];
   return `<div style="display:flex;gap:6px;padding:8px 0;flex-wrap:wrap">
     ${pats.map(p => `
@@ -6096,6 +6097,7 @@ function rsPAT() {
     flag:     { icon:'🚩', name:'Bull Flag Pattern',          color:'#f59e0b', desc:'Strong impulse (pole) followed by tight parallel pullback — continuation setup' },
     asc_tri:  { icon:'📐', name:'Ascending Triangle',         color:'#22d3ee', desc:'Flat resistance + rising lows — buyers getting more aggressive, breakout imminent' },
     desc_tri: { icon:'📉', name:'Descending Triangle',        color:'#f87171', desc:'Flat support + declining highs — watch for breakdown or reversal at support' },
+    sym_tri:  { icon:'🔺', name:'Symmetrical Triangle',      color:'#a3e635', desc:'Declining highs + rising lows converging — breakout imminent, direction follows trend' },
   };
   const mi = modeInfo[mode];
 
@@ -6152,6 +6154,7 @@ function patScan(mode) {
     else if (mode === 'flag')     result = patDetectFlag(s);
     else if (mode === 'asc_tri')  result = patDetectAscTri(s);
     else if (mode === 'desc_tri') result = patDetectDescTri(s);
+    else if (mode === 'sym_tri')  result = patDetectSymTri(s);
 
     if (result && result.score >= 50) out.push({ ...s, patData: result });
   }
@@ -6445,6 +6448,137 @@ function patDetectDescTri(s) {
   };
 }
 
+// ── 5. Symmetrical Triangle ───────────────────────────────────────────────────
+// Unlike ascending (flat top) or descending (flat bottom):
+// - Swing HIGHS are strictly DECLINING (lower highs)
+// - Swing LOWS are strictly RISING (higher lows)
+// - Both converge toward the same apex point
+// - Breakout is neutral in isolation — bias comes from prior trend
+// Requires: ≥2 declining highs + ≥2 rising lows, span ≥ 6 weeks,
+//           highs declining > 1%, lows rising > 1%, price inside the triangle
+
+function patDetectSymTri(s) {
+  const wk = s.weekly;
+  const n  = wk.length;
+  if (n < 10) return null;
+
+  const bars = wk.slice(-22);   // last 22 weekly candles
+  const bn   = bars.length;
+
+  // Find swing highs and lows (2-bar window each side)
+  const swingH = [], swingL = [];
+  for (let i = 2; i < bn - 2; i++) {
+    if (bars[i].h >= bars[i-1].h && bars[i].h >= bars[i-2].h &&
+        bars[i].h >= bars[i+1].h && bars[i].h >= bars[i+2].h)
+      swingH.push({ val: bars[i].h, idx: i });
+    if (bars[i].l <= bars[i-1].l && bars[i].l <= bars[i-2].l &&
+        bars[i].l <= bars[i+1].l && bars[i].l <= bars[i+2].l)
+      swingL.push({ val: bars[i].l, idx: i });
+  }
+
+  if (swingH.length < 2 || swingL.length < 2) return null;
+
+  // --- Highs must be STRICTLY declining ---
+  let highsDecline = true;
+  for (let i = 1; i < swingH.length; i++) {
+    if (swingH[i].val >= swingH[i-1].val) { highsDecline = false; break; }
+  }
+  if (!highsDecline) return null;
+
+  // --- Lows must be STRICTLY rising ---
+  let lowsRise = true;
+  for (let i = 1; i < swingL.length; i++) {
+    if (swingL[i].val <= swingL[i-1].val) { lowsRise = false; break; }
+  }
+  if (!lowsRise) return null;
+
+  // --- Check it's NOT ascending (highs spread > 2.5%) or descending (lows spread > 2.5%) ---
+  // Ascending = flat top; Descending = flat bottom
+  // Symmetrical = both sides are MOVING (not flat)
+  const highSpread = (swingH[0].val - swingH[swingH.length-1].val) / swingH[0].val * 100;
+  const lowSpread  = (swingL[swingL.length-1].val - swingL[0].val) / swingL[0].val * 100;
+  if (highSpread < 1.0) return null;   // highs too flat — that's ascending triangle
+  if (lowSpread  < 1.0) return null;   // lows too flat — that's descending triangle
+
+  // --- Pattern span (at least 6 weeks) ---
+  const allIdxs = [...swingH.map(h=>h.idx), ...swingL.map(l=>l.idx)];
+  const span    = Math.max(...allIdxs) - Math.min(...allIdxs);
+  if (span < 6) return null;
+
+  // --- Price must still be INSIDE the triangle (between upper trendline and lower trendline) ---
+  // Approximate upper/lower trendlines at the last bar
+  const lastBar = bars[bn - 1];
+  const price   = s.price || lastBar.c;
+
+  // Linear interpolate trendlines to current bar
+  const h0 = swingH[0], h1 = swingH[swingH.length-1];
+  const l0 = swingL[0], l1 = swingL[swingL.length-1];
+  const upperAtNow = h0.val + (h1.val - h0.val) * ((bn-1 - h0.idx) / (h1.idx - h0.idx || 1));
+  const lowerAtNow = l0.val + (l1.val - l0.val) * ((bn-1 - l0.idx) / (l1.idx - l0.idx || 1));
+
+  // Price should be inside or very near the triangle (within 1% of either line)
+  if (price > upperAtNow * 1.015 || price < lowerAtNow * 0.985) return null;
+
+  // --- Compute apex and how far along we are (% of triangle completed) ---
+  // Apex where upper and lower trendlines meet
+  const upperSlope = h1.idx > h0.idx ? (h1.val - h0.val) / (h1.idx - h0.idx) : 0;
+  const lowerSlope = l1.idx > l0.idx ? (l1.val - l0.val) / (l1.idx - l0.idx) : 0;
+  let apexBar = bn - 1;
+  if (upperSlope < 0 && lowerSlope > 0) {
+    // Find where they intersect: h0.val + upperSlope*(x-h0.idx) = l0.val + lowerSlope*(x-l0.idx)
+    const denom = lowerSlope - upperSlope;
+    if (Math.abs(denom) > 0.001)
+      apexBar = (h0.val - l0.val + lowerSlope * l0.idx - upperSlope * h0.idx) / denom;
+  }
+  const barsToApex  = Math.max(0, apexBar - (bn - 1));
+  const triWidth    = upperAtNow - lowerAtNow;
+  const pctComplete = span > 0 ? Math.min(99, Math.round((bn - 1 - Math.min(...allIdxs)) / (apexBar - Math.min(...allIdxs) || 1) * 100)) : 50;
+
+  // --- Prior trend bias (for breakout direction) ---
+  const preTrendClose = wk.slice(-30, -22);
+  const preTrend = preTrendClose.length >= 3
+    ? (preTrendClose[preTrendClose.length-1].c > preTrendClose[0].c ? 'bullish' : 'bearish')
+    : 'neutral';
+
+  // --- Score ---
+  let score = 50;
+  score += swingH.length >= 3 ? 12 : 6;
+  score += swingL.length >= 3 ? 12 : 6;
+  score += highSpread >= 3 ? 10 : 5;
+  score += lowSpread  >= 3 ? 10 : 5;
+  score += pctComplete >= 70 ? 15 : pctComplete >= 50 ? 8 : 3;  // further along = more ready
+  score += span >= 12 ? 8 : span >= 8 ? 4 : 0;
+  score += preTrend === 'bullish' ? 8 : 0;
+  if (s.rsi && s.rsi > 45 && s.rsi < 70) score += 5;
+  score = Math.min(100, score);
+
+  // --- Trade levels ---
+  const atr = patATR(s.daily?.h||[], s.daily?.l||[], s.daily?.c||[], 14);
+  return {
+    pattern:      'sym_tri',
+    score,
+    upperLine:    +upperAtNow.toFixed(2),
+    lowerLine:    +lowerAtNow.toFixed(2),
+    triWidth:     +triWidth.toFixed(2),
+    span,
+    pctComplete,
+    barsToApex:   Math.round(barsToApex),
+    preTrend,
+    touchesH:     swingH.length,
+    touchesL:     swingL.length,
+    highSpread:   +highSpread.toFixed(1),
+    lowSpread:    +lowSpread.toFixed(1),
+    // Breakout levels
+    entryBull:    +(upperAtNow * 1.005).toFixed(2),    // just above upper trendline
+    entryBear:    +(lowerAtNow * 0.995).toFixed(2),    // just below lower trendline
+    slBull:       +(lowerAtNow - atr * 0.3).toFixed(2),
+    slBear:       +(upperAtNow + atr * 0.3).toFixed(2),
+    targetBull:   +(upperAtNow + triWidth).toFixed(2), // triangle height projected up
+    targetBear:   +(lowerAtNow - triWidth).toFixed(2), // triangle height projected down
+    detail:       `${swingH.length} declining highs (−${highSpread.toFixed(1)}%) + ${swingL.length} rising lows (+${lowSpread.toFixed(1)}%) · ${span}wk · ${pctComplete}% to apex`,
+  };
+}
+
 // ── Shared ATR helper ─────────────────────────────────────────────────────────
 function patATR(hs, ls, cs, period) {
   const n = cs.length;
@@ -6606,6 +6740,57 @@ function patCardHTML(s, mode, mi) {
           <div style="color:var(--muted2);margin-bottom:2px">Target</div>
           <div style="font-weight:800;color:var(--green)">₹${p.target}</div>
           <div style="font-size:.57rem;color:var(--muted2)">height projected</div>
+        </div>
+      </div>`;
+  }
+
+  else if (mode === 'sym_tri') {
+    const biasCol  = p.preTrend === 'bullish' ? 'var(--green)' : p.preTrend === 'bearish' ? 'var(--red)' : 'var(--yellow)';
+    const biasText = p.preTrend === 'bullish' ? '📈 Bullish bias (uptrend before triangle)' :
+                     p.preTrend === 'bearish' ? '📉 Bearish bias (downtrend before triangle)' :
+                     '⚖️ Neutral — wait for breakout direction';
+    patVisual = `
+      <div style="background:${col}0d;border:1px solid ${col}20;border-radius:8px;padding:9px 11px;margin-bottom:9px">
+        <div style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">
+          Symmetrical Triangle · ${p.detail}
+        </div>
+        <!-- Triangle visual: converging lines -->
+        <div style="position:relative;height:40px;margin-bottom:7px">
+          <!-- Upper declining line -->
+          <svg width="100%" height="40" style="position:absolute;top:0;left:0" preserveAspectRatio="none">
+            <line x1="0" y1="4"  x2="82%" y2="20" stroke="#f87171" stroke-width="1.5" stroke-dasharray="3,2" opacity=".7"/>
+            <line x1="0" y1="36" x2="82%" y2="20" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="3,2" opacity=".7"/>
+            <line x1="82%" y1="10" x2="100%" y2="20" stroke="${col}" stroke-width="2" opacity=".5"/>
+          </svg>
+          <div style="position:absolute;top:0;left:0;font-size:.58rem;color:#f87171">H↓</div>
+          <div style="position:absolute;bottom:0;left:0;font-size:.58rem;color:#4ade80">L↑</div>
+          <div style="position:absolute;top:50%;right:4px;transform:translateY(-50%);font-size:.78rem">→</div>
+        </div>
+        <div style="display:flex;gap:8px;font-size:.64rem;flex-wrap:wrap">
+          <span>Upper: <strong style="color:#f87171">₹${p.upperLine}</strong></span>
+          <span>Lower: <strong style="color:#4ade80">₹${p.lowerLine}</strong></span>
+          <span>Width: <strong style="color:var(--text)">₹${p.triWidth}</strong></span>
+          <span style="color:${p.pctComplete>=70?'var(--yellow)':'var(--muted2)'}">
+            ${p.pctComplete}% to apex${p.barsToApex>0?' (~'+p.barsToApex+'wk)':' — breakout due!'}
+          </span>
+        </div>
+        <div style="margin-top:5px;font-size:.65rem;color:${biasCol};font-weight:600">${biasText}</div>
+      </div>`;
+    tradeSection = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px;font-size:.63rem">
+        <div style="background:rgba(0,212,154,.1);border:1px solid rgba(0,212,154,.2);border-radius:7px;padding:8px">
+          <div style="color:var(--green);font-weight:700;margin-bottom:4px">📈 Bullish breakout</div>
+          <div>Entry: <strong style="color:var(--text)">₹${p.entryBull}</strong></div>
+          <div>SL: <strong style="color:var(--red)">₹${p.slBull}</strong></div>
+          <div>Target: <strong style="color:var(--green)">₹${p.targetBull}</strong></div>
+          <div style="color:var(--muted2);margin-top:2px">R:R 1:${p.slBull&&p.targetBull?+((p.targetBull-p.entryBull)/(p.entryBull-p.slBull)).toFixed(1):'?'}</div>
+        </div>
+        <div style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:8px">
+          <div style="color:var(--red);font-weight:700;margin-bottom:4px">📉 Bearish breakout</div>
+          <div>Entry: <strong style="color:var(--text)">₹${p.entryBear}</strong></div>
+          <div>SL: <strong style="color:var(--red)">₹${p.slBear}</strong></div>
+          <div>Target: <strong style="color:var(--red)">₹${p.targetBear}</strong></div>
+          <div style="color:var(--muted2);margin-top:2px">R:R 1:${p.slBear&&p.targetBear?+((p.entryBear-p.targetBear)/(p.slBear-p.entryBear)).toFixed(1):'?'}</div>
         </div>
       </div>`;
   }

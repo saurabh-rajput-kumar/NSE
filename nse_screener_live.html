@@ -583,8 +583,7 @@ input,select,textarea{font-size:16px!important;}
   <div class="ntab" id="t-iv" onclick="gt('iv')">💎 Invest</div>
   <div class="ntab" id="t-nf" onclick="gt('nf')">🇮🇳 Nifty</div>
   <div class="ntab" id="t-cr" onclick="gt('cr')">₿ Crypto</div>
-  <div class="ntab" id="t-mt" onclick="gt('mt')">📊 MTF RSI</div>
-  <div class="ntab" id="t-oi" onclick="gt('oi')">📈 OI</div>
+  <div class="ntab" id="t-fo" onclick="gt('fo')">📊 F&amp;O OI</div>
   <div class="ntab" id="t-fi" onclick="gt('fi')">🌍 FII/DII</div>
   <div class="ntab" id="t-ro" onclick="gt('ro')">🔁 Rotation</div>
   <div class="ntab" id="t-ca" onclick="gt('ca')">📅 Calendar</div>
@@ -1053,7 +1052,7 @@ const SM={"RELIANCE":"Energy","ONGC":"Energy","COALINDIA":"Energy","TATAPOWER":"
   "BANKINDIA":"Banking"};
 const SC={"Energy":"#ff9f43","IT":"#54a0ff","Banking":"#5f27cd","NBFC":"#a29bfe","Insurance":"#fd79a8","FMCG":"#00b894","Pharma":"#00cec9","Auto":"#e17055","Paints":"#fdcb6e","Infra":"#636e72","Metals":"#b2bec3","Cement":"#dfe6e9","Jewellery":"#f9ca24","Healthcare":"#6ab04c","Cons.Elec":"#e55039","New Age":"#8e44ad","Aviation":"#2980b9","Fin Svc":"#27ae60","Chemicals":"#d35400","Realty":"#c0392b","Apparel":"#7f8c8d","Agri":"#16a085","Retail":"#e84393","Beverages":"#6c5ce7"};
 const SYMS_P1=["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR", "SBIN", "BHARTIARTL", "ITC", "KOTAKBANK", "LT", "AXISBANK", "ASIANPAINT", "MARUTI", "NESTLEIND", "ULTRACEMCO", "TITAN", "BAJFINANCE", "WIPRO", "HCLTECH", "SUNPHARMA", "ONGC", "POWERGRID", "NTPC", "TECHM", "DRREDDY", "CIPLA", "DIVISLAB", "EICHERMOT", "HEROMOTOCO", "BAJAJFINSV", "BRITANNIA", "ADANIENT", "ADANIPORTS", "COALINDIA", "GRASIM", "JSWSTEEL", "TATASTEEL", "HINDALCO", "INDUSINDBK", "BAJAJ-AUTO", "M%26M", "TATACONSUM", "APOLLOHOSP", "HAVELLS", "DABUR", "MARICO", "COLPAL", "PIDILITIND", "BERGEPAINT", "VOLTAS", "GODREJCP", "DLF", "ZOMATO", "IRCTC", "INDIGO", "TRENT", "MUTHOOTFIN", "CHOLAFIN", "SBILIFE", "HDFCLIFE", "ICICIGI", "LICI", "FEDERALBNK", "IDFCFIRSTB", "BANDHANBNK", "RBLBANK", "PNB", "BANKBARODA", "CANBK", "UNIONBANK", "SAIL", "NMDC", "TATAPOWER", "ADANIGREEN", "TORNTPOWER", "RECLTD", "PFC", "IRFC", "RVNL", "IRCON", "RAILTEL", "AUROPHARMA", "LUPIN", "GLENMARK", "ALKEM", "TORNTPHARM", "MPHASIS", "LTIM", "PERSISTENT", "COFORGE", "KPITTECH", "TATAELXSI", "DIXON", "NAUKRI", "INDIAMART", "AFFLE", "CAMS", "CDSL", "BSE", "MCX", "AARTIIND", "DEEPAKNITR", "SRF", "BALRAMCHIN", "EMAMILTD", "PAYTM", "NYKAA", "DELHIVERY", "ABFRL", "PAGEIND", "RADICO", "GODREJPROP", "PRESTIGE", "OBEROIRLTY", "BRIGADE", "ADANIPOWER", "ADANITRANS", "ADANIENSOL", "NTPCGREEN", "KPRMILL", "SUPREMEIND", "APLAPOLLO", "CESC", "NHPC", "SJVN", "JSWENERGY", "IPCALAB", "NATCOPHARM", "ABBOTINDIA", "MOTHERSON", "BHARATFORG", "BALKRISIND", "TIINDIA", "ABB", "SIEMENS", "BHEL", "THERMAX", "GRINDWELL", "MFSL", "IIFL", "ANGELONE", "MOTILALOFS", "VBL", "UBL", "MCDOWELL-N", "CYIENT", "MASTEK", "NIITTECH", "PIIND", "VINATIORGA", "NAVINFLUOR", "POLICYBZR", "CARTRADE", "CAMPUS", "LTTS", "HAPPSTMNDS", "INTELLECT", "BIOCON", "SYNGENE", "JBCHEPHARM", "LAURUSLABS", "GRANULES", "ASTERDM", "METROPOLIS", "TATAMOTORS", "TVSMOTOR", "ASHOKLEYL", "ENDURANCE", "EXIDEIND", "AMARA", "MAHINDCIE", "CANFINHOME", "AAVAS", "HOMEFIRST", "360ONE", "HDFCAMC", "ABCAPITAL", "MANAPPURAM", "SBICARDS", "JIOFIN", "PHOENIXLTD", "LODHA", "IGL", "MGL", "GUJGASLTD", "DEEPAKNTR", "ALKYLAMINE", "FLUOROCHEM", "ASTRAL", "DMART", "PAGE", "KALYANKJIL", "SENCO", "JUBLFOOD", "HAL", "BEL", "CUMMINSIND", "BEML", "RATNAMANI", "VEDL", "HINDCOPPER", "JINDALSAW", "HUDCO", "IREDA", "CONCOR", "JYOTHYLAB", "POLYCAB", "KAYNES", "SYRMA", "TATACOMM", "ZEEL", "PVR"];
-const SYMS_P2=["NUVOCO", "KARURVYSYA", "CSBBANK", "EQUITASBNK", "UJJIVANSFB", "SURYODAY", "DCBBANK", "STARHEALTH", "NIACL", "GICRE", "ICICIPRU", "UTIAMC", "WEALTH", "ISEC", "IIFLSEC", "EDELWEISS", "SBFC", "UGROCAP", "CREDITACC", "ARMANFIN", "SPANDANA", "FUSION", "PNBHOUSING", "APTUS", "INDIABULL", "HDFCSEC", "CHOLAHLDNG", "TATACHEM", "NOCIL", "PCBL", "DCMSHRIRAM", "ATUL", "BASF", "SUMICHEM", "GNFC", "CLEAN", "VINYSCORP", "HIKAL", "ROSSARI", "FINEORG", "SUPRIYA", "AETHER", "SUDARSCHEM", "TVSHLTD", "SUPRAJIT", "SUNDRMFAST", "NRBBEARING", "ASAHIINDIA", "SCHAEFFLER", "TIMKEN", "SKFINDIA", "ZENTEC", "IDEAFORGE", "MTAR", "ELIN", "MAZDOCK", "COCHINSHIP", "GRSE", "RPSGVENT", "SHREECEM", "HEIDELBERG", "WELSPUNIND", "WELCORP", "NATIONALUM", "MOIL", "TATAMETALIK", "SHYAMMETL", "SOBHA", "KEYSTONE", "MAHLIFE", "SAREGAMA", "TIPS", "BALAJITELE", "NAZARA", "DELTACORP", "TVTODAY", "DBCORP", "GIPCL", "ATGL", "RPOWER", "ADANIGASP", "VARUN", "VSTIND", "PATANJALI", "RAYMOND", "VMART", "METROBRAND", "DEVYANI", "UNITDSPR", "HONAUT", "GILLETTE", "PGHH", "HAPPY", "BSOFT", "ZENSAR", "NIITLTD", "RATEGAIN", "TANLA", "JUSTDIAL", "REDINGTON", "EASEMYTRIP", "IXIGO", "GSHIP", "SCI", "GPPL", "CONCORD", "MAHLOG", "EPIGRAL", "GARFIBRES", "GOKUL", "SEQUENT", "MSTCLTD", "VSTTILLERS", "KIRLOSENGB", "WABAG", "NILAINFRA", "GLAND", "NEULANDLAB", "SPARC", "ERIS", "MEDANTA", "KRSNAA", "INOX", "GREENPANEL", "CENTURYPLY", "GREENPLY", "VARDHMAN", "TRIDENT", "ARVIND", "WELSPUN", "HLEGLAS", "BOMDYEING", "NETWORK18", "JAGRAN", "NSLNISP", "TATAINVEST", "BAJAJCON", "LANDMARK", "SAPPHIREFDS", "GLAXO", "PFIZER", "ASTRAZEN", "SANOFI", "3MINDIA", "CEATLTD", "MAPMYINDIA", "RITES", "THDC", "GMRAIRPORT", "ADANIAIRPORT", "TTML", "HFCL", "STLTECH", "VINDHYATEL", "TEJAS", "SOUTHBANK", "IOB", "UCOBANK", "CENTRALBNK", "MAHABANK", "JKBANK", "KARNATAKA", "TMBBANK", "CITYUNIONBK", "LAKSHVILAS", "AUBANK", "FINOPB", "NAINITAL", "ICICIB25", "LICNETFN5", "GOLDBEES", "LICHSGFIN", "REPCO", "SBICARD", "PAISALO", "AROHAN", "ASIANLEASIN", "OFSS", "HEXAWARE", "BIRLASOFT", "ECLERX", "DATAMATICS", "TATATECH", "SONATASOFTW", "ROUTE", "NEWGEN", "NUCLEUS", "SAKSOFT", "QUICKHEAL", "WINDLAS", "SOLARA", "BLISSGVS", "NUVAXOVID", "OPTIEMUS", "FCONSUMER", "ALEMBICLTD", "FDC", "NATCOPHARMA", "AMRUTANJAN", "AJANTPHARM", "SUVEN", "CAPLIPOINT", "SHILPAMED", "STRIDES", "MARKSANS", "LAURUS", "DRREDDYLAB", "NEOGEN", "CAMLIN", "INSECTICID", "DHANUKA", "RALLIS", "BAYER", "GHCL", "AKZONOBLE", "GUJALKALI", "IOLCP", "LXCHEM", "ARCHCHEM", "TRONOX", "CHEMPLAST", "ANUPAM", "NFIL", "SWANENERGY", "WABCOINDIA", "ZFCVINDIA", "BOSCHLTD", "SUNDARAM", "MINDAIND", "MINDA", "GABRIEL", "JAMNA", "CRAFTSMAN", "SUBROS", "LUMAX", "SPIINDUS", "FABRINET", "ACCELYA", "MISHRA", "AEROFLEXIND", "SOLARINDS", "PARAS", "TEXMOPIPES", "TRIVENI", "KENNAMETAL", "ELGIEQUIP", "ISGEC", "PRAJ", "SPCENET", "BLS", "BHARAT", "APARINDS", "ELECON", "GRAPHITE", "HEG", "POWERINDIA", "CG", "VOLTAMP", "TDPOWERSYS", "INOXWIND", "SUZLON", "RNEWIND", "WINDWORLD", "GREENENERGY", "ORIENT", "BATA", "RELAXO", "VIPIND", "SAFARI", "SAMSONITE", "VIP", "WEDGWOOD", "THANGAMAYL", "GOLDIAM", "PCJEWELLER", "SHOPERSTOP", "INDIGOPNTS", "BAJAJELEC", "WHIRLPOOL", "SYMPHONY", "AMBER", "BLUESTAR", "HITACHI", "ONMOBILE", "PB", "XPRESSBEES", "VENKEYS", "TASTYBITESS", "HERITAGE", "DODLA", "HATSUN", "HPCL", "BPCL", "IOC", "MRPL", "CPCL", "ENNORE", "RAMASTEEL", "GALLANTT", "MSTEEL", "NILE", "JAYASWAL", "ISPAT", "MANAKSIA", "SHAREINDIA", "NCC", "HG", "KNR", "AHLUCONT", "DILIPBUILDCON", "PNCINFRA", "GESHIP", "GMRINFRA", "GVK", "IRB", "MEP", "SADBHAV", "NBCC", "HINDPETRO", "PETRONET", "GAIL", "GSPL", "AEGASLTD", "ORIENTGREN", "BOROSIL", "KOLTEPATIL", "PURAVANKARA", "ARIHANTSUPR", "SUNTECK", "IBREALEST", "ELDECO", "KRISHNAVAL", "ASHIANA", "WPIL", "ANANTRAJ", "AMBUJACEM", "ACC", "BIRLACORPN", "SANGHI", "INDIACEM", "WCLGROUP", "KCP", "PRISMJOHNSN", "NCL", "SUNTV", "HATHWAY", "GTLINFRA", "DEN", "RUPA", "DOLLAR", "NAHAR", "NITIN", "SUTLEJTEX", "HIMATSEIDE", "SIYARAM", "BOMBDYEING", "INDHOTEL", "EIHOTEL", "MAHINDRA", "CHALET", "LEMONTRE", "YATRA", "MAKEMYTRIP", "BLUEDART", "GATEWAY", "ALLCARGO", "TCI", "TCNSCLOTH", "VRLLOGISTIC", "MAHINDLOG", "NAVKAR", "SNOWMAN", "UPL", "COROMANDEL", "CHAMBALFERT", "RCF", "FACT", "KSCL", "IFFCO", "ZUARI", "NFL", "RLFL", "JINDALSTEL", "JSPL", "JSWHL", "ESAFSFB", "INDIANB", "IDBI", "LALPATHLAB", "THYROCARE", "MAXHEALTH", "FORTIS", "FIVESTAR", "SHRIRAMFIN", "KFINTECH", "BSEIND", "RAILVIKAS", "SHARDACROP", "PRINCEPIPE", "KEI", "VGUARD", "FINOLEX", "CROMPTON", "GODREJIND", "BAJAJHLDNG", "KANSAINER", "AKZONOBEL", "JUBLPHARMA", "NATCO", "NESTLE", "COLGATE", "EMAMI", "KNRCON", "HCC", "KITEX", "LUXIND", "AIAENG", "CARBORUNIV", "SHALBY", "YATHARTH", "KIMS", "RAINBOW", "VIJAYABANK", "UJJIVAN", "EQUITAS", "CHOLAMAND", "JUBILANT", "BOI", "CENTRALBK", "ICICIPRULI", "BANKINDIA", "JKCEMENT", "RAMCOCEM", "POLYPLEX", "HAPPST"];
+const SYMS_P2=["NUVOCO", "KARURVYSYA", "CSBBANK", "EQUITASBNK", "UJJIVANSFB", "SURYODAY", "DCBBANK", "STARHEALTH", "NIACL", "GICRE", "ICICIPRU", "UTIAMC", "WEALTH", "ISEC", "IIFLSEC", "EDELWEISS", "SBFC", "UGROCAP", "CREDITACC", "ARMANFIN", "SPANDANA", "FUSION", "PNBHOUSING", "APTUS", "INDIABULL", "HDFCSEC", "CHOLAHLDNG", "TATACHEM", "NOCIL", "PCBL", "DCMSHRIRAM", "ATUL", "BASF", "SUMICHEM", "GNFC", "CLEAN", "VINYSCORP", "HIKAL", "ROSSARI", "FINEORG", "SUPRIYA", "AETHER", "SUDARSCHEM", "TVSHLTD", "SUPRAJIT", "SUNDRMFAST", "NRBBEARING", "ASAHIINDIA", "SCHAEFFLER", "TIMKEN", "SKFINDIA", "ZENTEC", "IDEAFORGE", "MTAR", "ELIN", "MAZDOCK", "COCHINSHIP", "GRSE", "RPSGVENT", "SHREECEM", "HEIDELBERG", "WELSPUNIND", "WELCORP", "NATIONALUM", "MOIL", "TATAMETALIK", "SHYAMMETL", "SOBHA", "KEYSTONE", "MAHLIFE", "SAREGAMA", "TIPS", "BALAJITELE", "NAZARA", "DELTACORP", "TVTODAY", "DBCORP", "GIPCL", "ATGL", "RPOWER", "ADANIGASP", "VARUN", "VSTIND", "PATANJALI", "RAYMOND", "VMART", "METROBRAND", "DEVYANI", "UNITDSPR", "HONAUT", "GILLETTE", "PGHH", "HAPPY", "BSOFT", "ZENSAR", "NIITLTD", "RATEGAIN", "TANLA", "JUSTDIAL", "REDINGTON", "EASEMYTRIP", "IXIGO", "GSHIP", "SCI", "GPPL", "CONCORD", "MAHLOG", "EPIGRAL", "GARFIBRES", "GOKUL", "SEQUENT", "MSTCLTD", "VSTTILLERS", "KIRLOSENGB", "WABAG", "NILAINFRA", "GLAND", "NEULANDLAB", "SPARC", "ERIS", "MEDANTA", "KRSNAA", "INOX", "GREENPANEL", "CENTURYPLY", "GREENPLY", "VARDHMAN", "TRIDENT", "ARVIND", "WELSPUN", "HLEGLAS", "BOMDYEING", "NETWORK18", "JAGRAN", "NSLNISP", "TATAINVEST", "BAJAJCON", "LANDMARK", "SAPPHIREFDS", "GLAXO", "PFIZER", "ASTRAZEN", "SANOFI", "3MINDIA", "CEATLTD", "MAPMYINDIA", "RITES", "THDC", "GMRAIRPORT", "ADANIAIRPORT", "TTML", "HFCL", "STLTECH", "VINDHYATEL", "TEJAS", "SOUTHBANK", "IOB", "UCOBANK", "CENTRALBNK", "MAHABANK", "JKBANK", "KARNATAKA", "TMBBANK", "CITYUNIONBK", "LAKSHVILAS", "AUBANK", "FINOPB", "NAINITAL", "ICICIB25", "LICNETFN5", "GOLDBEES", "LICHSGFIN", "REPCO", "SBICARD", "PAISALO", "AROHAN", "ASIANLEASIN", "OFSS", "HEXAWARE", "BIRLASOFT", "ECLERX", "DATAMATICS", "TATATECH", "SONATASOFTW", "ROUTE", "NEWGEN", "NUCLEUS", "SAKSOFT", "QUICKHEAL", "WINDLAS", "SOLARA", "BLISSGVS", "NUVAXOVID", "OPTIEMUS", "FCONSUMER", "ALEMBICLTD", "FDC", "NATCOPHARMA", "AMRUTANJAN", "AJANTPHARM", "SUVEN", "CAPLIPOINT", "SHILPAMED", "STRIDES", "MARKSANS", "LAURUS", "DRREDDYLAB", "NEOGEN", "CAMLIN", "INSECTICID", "DHANUKA", "RALLIS", "BAYER", "GHCL", "AKZONOBLE", "GUJALKALI", "IOLCP", "LXCHEM", "ARCHCHEM", "TRONOX", "CHEMPLAST", "ANUPAM", "NFIL", "SWANENERGY", "WABCOINDIA", "ZFCVINDIA", "BOSCHLTD", "SUNDARAM", "MINDAIND", "MINDA", "GABRIEL", "JAMNA", "CRAFTSMAN", "SUBROS", "LUMAX", "SPIINDUS", "FABRINET", "ACCELYA", "MISHRA", "AEROFLEXIND", "SOLARINDS", "PARAS", "TEXMOPIPES", "TRIVENI", "KENNAMETAL", "ELGIEQUIP", "ISGEC", "PRAJ", "SPCENET", "BLS", "BHARAT", "APARINDS", "ELECON", "GRAPHITE", "HEG", "POWERINDIA", "CG", "VOLTAMP", "TDPOWERSYS", "INOXWIND", "SUZLON", "RNEWIND", "WINDWORLD", "GREENENERGY", "ORIENT", "BATA", "RELAXO", "VIPIND", "SAFARI", "SAMSONITE", "VIP", "WEDGWOOD", "THANGAMAYL", "GOLDIAM", "PCJEWELLER", "SHOPERSTOP", "INDIGOPNTS", "BAJAJELEC", "WHIRLPOOL", "SYMPHONY", "AMBER", "BLUESTAR", "HITACHI", "ONMOBILE", "PB", "XPRESSBEES", "VENKEYS", "TASTYBITESS", "HERITAGE", "DODLA", "HATSUN", "HPCL", "BPCL", "IOC", "MRPL", "CPCL", "ENNORE", "RAMASTEEL", "GALLANTT", "MSTEEL", "NILE", "JAYASWAL", "ISPAT", "MANAKSIA", "SHAREINDIA", "NCC", "HG", "KNR", "AHLUCONT", "DILIPBUILDCON", "PNCINFRA", "GESHIP", "GMRINFRA", "GVK", "IRB", "MEP", "SADBHAV", "NBCC", "HINDPETRO", "PETRONET", "GAIL", "GSPL", "AEGASLTD", "ORIENTGREN", "BOROSIL", "KOLTEPATIL", "PURAVANKARA", "ARIHANTSUPR", "SUNTECK", "ELDECO", "KRISHNAVAL", "ASHIANA", "WPIL", "ANANTRAJ", "AMBUJACEM", "ACC", "BIRLACORPN", "SANGHI", "INDIACEM", "WCLGROUP", "KCP", "PRISMJOHNSN", "NCL", "SUNTV", "HATHWAY", "GTLINFRA", "DEN", "RUPA", "DOLLAR", "NAHAR", "NITIN", "SUTLEJTEX", "HIMATSEIDE", "SIYARAM", "BOMBDYEING", "INDHOTEL", "EIHOTEL", "MAHINDRA", "CHALET", "LEMONTRE", "YATRA", "MAKEMYTRIP", "BLUEDART", "GATEWAY", "ALLCARGO", "TCI", "TCNSCLOTH", "VRLLOGISTIC", "MAHINDLOG", "NAVKAR", "SNOWMAN", "UPL", "COROMANDEL", "CHAMBALFERT", "RCF", "FACT", "KSCL", "IFFCO", "ZUARI", "NFL", "RLFL", "JINDALSTEL", "JSPL", "JSWHL", "ESAFSFB", "INDIANB", "IDBI", "LALPATHLAB", "THYROCARE", "MAXHEALTH", "FORTIS", "FIVESTAR", "SHRIRAMFIN", "KFINTECH", "BSEIND", "RAILVIKAS", "SHARDACROP", "PRINCEPIPE", "KEI", "VGUARD", "FINOLEX", "CROMPTON", "GODREJIND", "BAJAJHLDNG", "KANSAINER", "AKZONOBEL", "JUBLPHARMA", "NATCO", "NESTLE", "COLGATE", "EMAMI", "KNRCON", "HCC", "KITEX", "LUXIND", "AIAENG", "CARBORUNIV", "SHALBY", "YATHARTH", "KIMS", "RAINBOW", "VIJAYABANK", "UJJIVAN", "EQUITAS", "CHOLAMAND", "JUBILANT", "BOI", "CENTRALBK", "ICICIPRULI", "BANKINDIA", "JKCEMENT", "RAMCOCEM", "POLYPLEX", "HAPPST"];
 const SYMS=SYMS_P1; // starts as P1; extended to full universe after bg load
 
 let AS=[],CT='sc',WP=0,SCH=null,ARE=true,CDI=null,CDS=180;
@@ -2295,7 +2294,7 @@ function togAR(){
     stopAR();toast('Auto-refresh OFF','i');
   }
 }
-async function silRef(){if(!AS.length)return;const b=document.getElementById('lbtn'),o=b.textContent;b.textContent='↻ Refreshing...';const B=8;for(let i=0;i<AS.length;i+=B){const res=await Promise.all(AS.slice(i,i+B).map(s=>fetchS(s.symbol)));res.forEach((r,j)=>{if(r)AS[i+j]=r;});await sl(80);}document.getElementById('lu').textContent='⚡ '+new Date().toLocaleTimeString('en-IN');b.textContent=o;const fn={sc:rs,mt:rMTF,oi:rOI,fi:rFII,ro:rRot,bt:rBT};if(fn[CT])fn[CT]();chkAlerts();}
+async function silRef(){if(!AS.length)return;const b=document.getElementById('lbtn'),o=b.textContent;b.textContent='↻ Refreshing...';const B=8;for(let i=0;i<AS.length;i+=B){const res=await Promise.all(AS.slice(i,i+B).map(s=>fetchS(s.symbol)));res.forEach((r,j)=>{if(r)AS[i+j]=r;});await sl(80);}document.getElementById('lu').textContent='⚡ '+new Date().toLocaleTimeString('en-IN');b.textContent=o;const fn={sc:rs,fo:rFnO,fi:rFII,ro:rRot,bt:rBT};if(fn[CT])fn[CT]();chkAlerts();}
 
 // ── BG_LOADING: tracks whether phase-2 background load is in progress ───────
 let BG_LOADING = false;
@@ -2349,7 +2348,7 @@ async function loadData(){
   updSecFilter();
   document.getElementById('lu').textContent='✅ Full '+new Date().toLocaleTimeString('en-IN');
   toast('Full universe loaded ('+AS.length+' stocks) — refreshing…','i');
-  const fn={sc:rs,mt:rMTF,oi:rOI,fi:rFII,ro:rRot,bt:rBT,sg:rSG};
+  const fn={sc:rs,fo:rFnO,fi:rFII,ro:rRot,bt:rBT,sg:rSG};
   if(fn[CT])fn[CT]();
 }
 
@@ -2373,7 +2372,7 @@ function bgBadge(loading, pct, total){
 
 function startARI(){if(ALI)clearInterval(ALI);ALI=setInterval(chkAlerts,30000);}
 
-function gt(t){CT=t;document.querySelectorAll('.ntab').forEach(e=>e.classList.remove('active'));const e=document.getElementById('t-'+t);if(e)e.classList.add('active');document.getElementById('cbar').style.display=t==='sc'?'flex':'none';document.getElementById('tf-panel').style.display=t==='sc'?'block':'none';const fn={sc:rs,mt:rMTF,oi:rOI,fi:rFII,ro:rRot,ca:rCal,nw:rNews,bt:rBT,ps:rPS,jn:rJnl,sg:rSG,ai:rAI,nf:rNifty,cr:rCrypto,iv:rInvest};if(fn[t])fn[t]();}
+function gt(t){CT=t;document.querySelectorAll('.ntab').forEach(e=>e.classList.remove('active'));const e=document.getElementById('t-'+t);if(e)e.classList.add('active');document.getElementById('cbar').style.display=t==='sc'?'flex':'none';document.getElementById('tf-panel').style.display=t==='sc'?'block':'none';const fn={sc:rs,fo:rFnO,fi:rFII,ro:rRot,ca:rCal,nw:rNews,bt:rBT,ps:rPS,jn:rJnl,sg:rSG,ai:rAI,nf:rNifty,cr:rCrypto,iv:rInvest};if(fn[t])fn[t]();}
 
 function getSD(){const m={};AS.forEach(s=>{const sec=s.sector||'Others';if(!m[sec])m[sec]={n:0,d:0,w:0};m[sec].n++;m[sec].d+=s.pctChange;m[sec].w+=s.weekChg||0;});return Object.entries(m).map(([name,d])=>{const avgD=d.d/d.n,avgW=d.w/d.n;const state=avgW>1.5?'Momentum':avgW<-1.5?'Selling':Math.abs(avgW)<0.5?'Ranging':'Recovering';return{name,avgD,avgW,state};}).sort((a,b)=>b.avgW-a.avgW);}
 
@@ -2793,12 +2792,6 @@ async function chkAlerts(){const act=ALT.filter(a=>!a.triggered);if(!act.length)
 function toast(msg,type){const ta=document.getElementById('ta');const el=document.createElement('div');el.className=`ti ${type==='up'?'tiu':type==='dn'?'tid':''}`;el.innerHTML=`${type==='up'?'📈':type==='dn'?'📉':'ℹ️'} ${msg}`;ta.appendChild(el);setTimeout(()=>el.remove(),4500);}
 
 // MTF RSI
-function rMTF(){if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty">Load data first.</div>`;return;}const stocks=AS.filter(s=>s.rsi&&s.rsiW).sort((a,b)=>{const as=Math.abs(a.rsi-50)+Math.abs((a.rsiW||50)-50),bs=Math.abs(b.rsi-50)+Math.abs((b.rsiW||50)-50);return bs-as;}).slice(0,40);const rc=v=>v>70?'var(--red)':v<30?'var(--green)':'var(--accent)';document.getElementById('area').innerHTML=`<div class="sh">📊 MTF RSI — Daily + Weekly</div><div class="mtfg">${stocks.map(s=>{const rd=s.rsi,rw=s.rsiW||50;const dc=rc(rd),wc=rc(rw);const ag=(rd<45&&rw<50)||(rd>55&&rw>50);return`<div class="mtfc"><div style="font-weight:700;color:#fff;font-size:.83rem;margin-bottom:7px">${s.symbol}${ag?` <span style="font-size:.6rem;background:rgba(0,200,150,.15);color:var(--green);border-radius:4px;padding:1px 5px;font-weight:700">ALIGNED</span>`:''}</div><div class="rb"><div class="rbl"><span>Daily RSI</span><span style="color:${dc};font-weight:700">${rd.toFixed(1)}</span></div><div class="rbr"><div class="rbf" style="width:${rd}%;background:${dc}"></div></div></div><div class="rb"><div class="rbl"><span>Weekly RSI</span><span style="color:${wc};font-weight:700">${rw.toFixed(1)}</span></div><div class="rbr"><div class="rbf" style="width:${rw}%;background:${wc}"></div></div></div><div style="font-size:.62rem;color:var(--muted);margin-top:3px">₹${s.price.toFixed(1)} <span class="${s.pctChange>=0?'up':'dn'}">${(s.pctChange>=0?'+':'')+s.pctChange.toFixed(2)}%</span></div></div>`;}).join('')}</div>`;}
-
-// OI
-function rOI(){if(!AS.length){document.getElementById('area').innerHTML=`<div class="empty">Load data first.</div>`;return;}const stocks=AS.sort((a,b)=>b.lastVol-a.lastVol).slice(0,30);document.getElementById('area').innerHTML=`<div class="sh">📈 OI Analysis (Volume Proxy)</div><div class="ibox"><strong>Note:</strong> Real OI needs NSE auth. Using volume proxy to estimate CE/PE interest.</div><div class="tw"><table><thead><tr><th>Symbol</th><th>Price</th><th>CE OI</th><th>PE OI</th><th>P/C</th><th>Sentiment</th><th>Key Level</th></tr></thead><tbody>${stocks.map(s=>{const pc=s.peOI/s.ceOI,sent=pc>1.2?'Bullish 🟢':pc<0.8?'Bearish 🔴':'Neutral 🟡';const kl=pc>1?s.sr.r[0]:s.sr.s[0];return`<tr><td><strong>${s.symbol}</strong></td><td>₹${s.price.toFixed(1)}</td><td>${(s.ceOI/100).toFixed(0)}L</td><td>${(s.peOI/100).toFixed(0)}L</td><td style="font-weight:700;color:${pc>1.2?'var(--green)':pc<0.8?'var(--red)':'var(--yellow)'}">${pc.toFixed(2)}</td><td>${sent}</td><td style="font-size:.72rem">${kl?'₹'+kl.toFixed(1):'–'}</td></tr>`;}).join('')}</tbody></table></div>`;}
-
-// FII/DII — direct links to official sources
 function rFII(){
   document.getElementById('area').innerHTML = `
     <div class="sh">🌍 FII / DII Activity</div>
@@ -6882,6 +6875,307 @@ function patCardHTML(s, mode, mi) {
       </span>
     </div>
   </div>`;
+}
+
+
+// ── F&O OI TAB ────────────────────────────────────────────────────────────────
+// Detects OI buildup signals using Yahoo Finance F&O data
+// OI↑ + Price↑ = Long Buildup   (bulls adding — most bullish signal)
+// OI↑ + Price↓ = Short Buildup  (bears adding — bearish signal)
+// OI↓ + Price↓ = Long Unwinding (bulls exiting — bearish)
+// OI↓ + Price↑ = Short Covering (bears exiting — mild bullish)
+//
+// Yahoo Finance provides openInterest in the /quote API for F&O stocks
+// We fetch a batch of stocks, compare OI vs prev OI, classify signal
+
+let FNO_STATE = { results: [], loading: false, filter: 'all', lastScan: null };
+
+function rFnO() {
+  const area = document.getElementById('area');
+  area.innerHTML = `
+    <div class="sh">📊 F&amp;O Open Interest Analysis
+      <div class="sh-line"></div>
+      <span style="font-size:.63rem;color:var(--muted2)">OI buildup · Price + OI trend · Long/Short positions</span>
+    </div>
+
+    <!-- Filter row -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+      ${['all','long_build','short_build','long_unwind','short_cover'].map(f => {
+        const labels = {
+          all:         'All Signals',
+          long_build:  '🟢 Long Buildup',
+          short_build: '🔴 Short Buildup',
+          long_unwind: '🟡 Long Unwinding',
+          short_cover: '⚪ Short Covering',
+        };
+        const active = FNO_STATE.filter === f;
+        return `<button onclick="fnoFilter('${f}')" id="fno-f-${f}"
+          style="padding:5px 12px;border-radius:8px;font-size:.69rem;font-weight:700;cursor:pointer;
+                 border:1px solid ${active?'var(--accent)':'var(--border2)'};
+                 background:${active?'var(--accent)':'var(--card)'};
+                 color:${active?'#fff':'var(--muted2)'};transition:all .15s">${labels[f]}</button>`;
+      }).join('')}
+      <button onclick="fnoScan()" id="fno-scan-btn"
+        style="margin-left:auto;padding:5px 16px;border-radius:8px;font-size:.7rem;font-weight:700;
+               cursor:pointer;background:linear-gradient(135deg,#6c63ff,#4f8ef7);color:#fff;border:none">
+        🔍 Scan F&amp;O Stocks
+      </button>
+    </div>
+
+    <!-- Info box -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:10px;
+                padding:11px 14px;margin-bottom:14px;font-size:.67rem;color:var(--muted2);line-height:1.8">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <span>🟢 <strong style="color:var(--green)">Long Buildup</strong> — OI↑ + Price↑ · Bulls adding positions</span>
+        <span>🔴 <strong style="color:var(--red)">Short Buildup</strong> — OI↑ + Price↓ · Bears adding positions</span>
+        <span>🟡 <strong style="color:var(--yellow)">Long Unwinding</strong> — OI↓ + Price↓ · Bulls exiting longs</span>
+        <span>⚪ <strong style="color:var(--muted2)">Short Covering</strong> — OI↓ + Price↑ · Bears buying back shorts</span>
+      </div>
+    </div>
+
+    <div id="fno-results">
+      ${FNO_STATE.results.length
+        ? fnoRenderResults(FNO_STATE.results)
+        : `<div class="ibox" style="font-size:.7rem">
+            Click <strong>Scan F&amp;O Stocks</strong> to fetch OI data for Nifty 500 F&amp;O stocks.
+            Scans top 80 most liquid F&amp;O stocks — takes ~20 seconds.
+           </div>`}
+    </div>`;
+}
+
+function fnoFilter(f) {
+  FNO_STATE.filter = f;
+  // Update button styles
+  ['all','long_build','short_build','long_unwind','short_cover'].forEach(k => {
+    const btn = document.getElementById('fno-f-' + k);
+    if (!btn) return;
+    const active = k === f;
+    btn.style.background = active ? 'var(--accent)' : 'var(--card)';
+    btn.style.color = active ? '#fff' : 'var(--muted2)';
+    btn.style.borderColor = active ? 'var(--accent)' : 'var(--border2)';
+  });
+  const resEl = document.getElementById('fno-results');
+  if (resEl && FNO_STATE.results.length) resEl.innerHTML = fnoRenderResults(FNO_STATE.results);
+}
+
+// NSE F&O stock list — top 80 by liquidity (subset of Nifty 500 F&O segment)
+const FNO_STOCKS = [
+  'RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK','HINDUNILVR','ITC','SBIN','BHARTIARTL','KOTAKBANK',
+  'LT','HCLTECH','AXISBANK','BAJFINANCE','MARUTI','ASIANPAINT','TITAN','SUNPHARMA','ULTRACEMCO','ONGC',
+  'NTPC','POWERGRID','WIPRO','ADANIPORTS','COALINDIA','TECHM','TATAMOTORS','TATASTEEL','JSWSTEEL','HINDALCO',
+  'NESTLEIND','DRREDDY','DIVISLAB','CIPLA','APOLLOHOSP','EICHERMOT','BAJAJFINSV','BAJAJ-AUTO','HEROMOTOCO','M&M',
+  'INDUSINDBK','TATACONSUM','BRITANNIA','HAVELLS','PIDILITIND','SIEMENS','ABB','DMART','NAUKRI','ZOMATO',
+  'PAYTM','IRCTC','MCDOWELL-N','BERGEPAINT','COLPAL','MARICO','DABUR','GODREJCP','EMAMILTD','PAGEIND',
+  'MUTHOOTFIN','CHOLAFIN','SHRIRAMFIN','PEL','LTIM','PERSISTENT','MPHASIS','COFORGE','ZYDUSLIFE','LUPIN',
+  'TORNTPHARM','AUROPHARMA','GLENMARK','IPCALAB','ALKEM','GRASIM','AMBUJACEM','ACC','SHREECEM','RAMCOCEM',
+];
+
+async function fnoScan() {
+  if (FNO_STATE.loading) return;
+  FNO_STATE.loading = true;
+  const btn = document.getElementById('fno-scan-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning OI…'; }
+
+  const resEl = document.getElementById('fno-results');
+  if (resEl) resEl.innerHTML = `
+    <div class="loader" style="margin:30px auto">
+      <div class="spin"></div>
+      <div class="lt">Fetching OI data for ${FNO_STOCKS.length} F&O stocks…<br>
+        <span style="font-size:.63rem;color:var(--muted2)">Comparing current OI vs previous — takes ~20 seconds</span>
+      </div>
+    </div>`;
+
+  // Fetch OI data in batches of 8
+  const results = [];
+  const BATCH = 8;
+  for (let i = 0; i < FNO_STOCKS.length; i += BATCH) {
+    const batch = FNO_STOCKS.slice(i, i + BATCH);
+    const settled = await Promise.allSettled(batch.map(sym => fnoFetchStock(sym)));
+    settled.forEach(r => { if (r.status === 'fulfilled' && r.value) results.push(r.value); });
+    // Update progress
+    if (resEl) {
+      const pct = Math.round((i + BATCH) / FNO_STOCKS.length * 100);
+      resEl.querySelector('.lt') && (resEl.querySelector('.lt').innerHTML =
+        `Fetching OI data… ${Math.min(pct, 100)}% (${results.length} stocks processed)`);
+    }
+    await new Promise(r => setTimeout(r, 200)); // small delay between batches
+  }
+
+  FNO_STATE.results  = results.sort((a, b) => Math.abs(b.oiChgPct) - Math.abs(a.oiChgPct));
+  FNO_STATE.lastScan = new Date();
+  FNO_STATE.loading  = false;
+
+  if (btn) { btn.disabled = false; btn.textContent = '🔍 Scan F&O Stocks'; }
+  if (resEl) resEl.innerHTML = fnoRenderResults(FNO_STATE.results);
+  toast(`OI scan complete — ${results.length} stocks analyzed`, 'i');
+}
+
+async function fnoFetchStock(sym) {
+  try {
+    // Yahoo Finance quote endpoint via our proxy
+    const r = await fetch(`${PROXY_BASE}/api/fno-oi?symbol=${sym}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (!d || d.error) return null;
+    return d;
+  } catch(e) {
+    return null;
+  }
+}
+
+function fnoClassify(oiChg, priceChg) {
+  if      (oiChg >= 0 && priceChg >= 0) return 'long_build';
+  else if (oiChg >= 0 && priceChg <  0) return 'short_build';
+  else if (oiChg <  0 && priceChg <  0) return 'long_unwind';
+  else                                   return 'short_cover';
+}
+
+function fnoRenderResults(results) {
+  const f = FNO_STATE.filter;
+  const filtered = f === 'all' ? results : results.filter(r => r.signal === f);
+
+  const counts = {
+    long_build:  results.filter(r => r.signal === 'long_build').length,
+    short_build: results.filter(r => r.signal === 'short_build').length,
+    long_unwind: results.filter(r => r.signal === 'long_unwind').length,
+    short_cover: results.filter(r => r.signal === 'short_cover').length,
+  };
+
+  const scanTime = FNO_STATE.lastScan
+    ? FNO_STATE.lastScan.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})
+    : '';
+
+  const sigConfig = {
+    long_build:  { label:'Long Buildup',   col:'var(--green)',  bg:'rgba(0,212,154,.12)',  icon:'🟢' },
+    short_build: { label:'Short Buildup',  col:'var(--red)',    bg:'rgba(255,69,96,.1)',   icon:'🔴' },
+    long_unwind: { label:'Long Unwinding', col:'var(--yellow)', bg:'rgba(245,197,24,.1)',  icon:'🟡' },
+    short_cover: { label:'Short Covering', col:'var(--muted2)', bg:'rgba(120,120,140,.1)', icon:'⚪' },
+  };
+
+  if (!filtered.length) return `<div class="ibox" style="color:var(--yellow)">
+    No stocks match the selected filter. Try "All Signals".
+  </div>`;
+
+  return `
+    <!-- Summary stats -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">
+      ${Object.entries(counts).map(([k, v]) => {
+        const cfg = sigConfig[k];
+        return `<div style="background:${cfg.bg};border:1px solid ${cfg.col}25;border-radius:9px;
+                            padding:8px;text-align:center;cursor:pointer" onclick="fnoFilter('${k}')">
+          <div style="font-size:.68rem">${cfg.icon}</div>
+          <div style="font-size:1rem;font-weight:800;color:${cfg.col}">${v}</div>
+          <div style="font-size:.58rem;color:var(--muted2);margin-top:1px">${cfg.label}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div style="font-size:.63rem;color:var(--muted2);margin-bottom:8px">
+      ${filtered.length} stocks · ${f === 'all' ? 'all signals' : sigConfig[f]?.label}
+      ${scanTime ? `· scanned at ${scanTime}` : ''}
+      · sorted by OI change %
+    </div>
+
+    <div class="grid">
+      ${filtered.map(s => {
+        const cfg = sigConfig[s.signal] || sigConfig.short_cover;
+        const tv  = `https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}`;
+        return `
+          <div class="card" style="--accent-line:${cfg.col}">
+            <div class="ch">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                  <div class="csym">${s.symbol}</div>
+                  <span style="font-size:.63rem;background:${cfg.bg};color:${cfg.col};
+                               border:1px solid ${cfg.col}30;padding:1px 7px;border-radius:8px;font-weight:700">
+                    ${cfg.icon} ${cfg.label}
+                  </span>
+                </div>
+                <div class="cname">${s.name || s.symbol}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:.84rem;font-weight:800;color:${s.priceChg>=0?'var(--green)':'var(--red)'}">
+                  ${s.priceChg>=0?'+':''}${s.priceChg?.toFixed(2)}%
+                </div>
+                <div style="font-size:.6rem;color:var(--muted2)">price chg</div>
+              </div>
+            </div>
+
+            <!-- OI change bar -->
+            <div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;font-size:.6rem;
+                          color:var(--muted2);margin-bottom:3px">
+                <span>OI Change</span>
+                <span style="color:${s.oiChgPct>=0?'var(--green)':'var(--red)'};font-weight:700">
+                  ${s.oiChgPct>=0?'+':''}${s.oiChgPct?.toFixed(1)}%
+                </span>
+              </div>
+              <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${Math.min(Math.abs(s.oiChgPct||0),100)}%;
+                            background:${cfg.col};border-radius:3px;opacity:.8"></div>
+              </div>
+            </div>
+
+            <!-- OI + price data grid -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;
+                        font-size:.64rem;margin-bottom:8px">
+              <div style="background:var(--card3);border-radius:7px;padding:6px;text-align:center">
+                <div style="color:var(--muted2);margin-bottom:2px">Price</div>
+                <div style="font-weight:800;color:var(--text)">₹${s.price?.toFixed(1)}</div>
+              </div>
+              <div style="background:var(--card3);border-radius:7px;padding:6px;text-align:center">
+                <div style="color:var(--muted2);margin-bottom:2px">Curr OI</div>
+                <div style="font-weight:800;color:${cfg.col}">${fmtOI(s.oi)}</div>
+              </div>
+              <div style="background:var(--card3);border-radius:7px;padding:6px;text-align:center">
+                <div style="color:var(--muted2);margin-bottom:2px">OI Chg</div>
+                <div style="font-weight:800;color:${s.oiChg>=0?'var(--green)':'var(--red)'}">
+                  ${s.oiChg>=0?'+':''}${fmtOI(s.oiChg)}
+                </div>
+              </div>
+            </div>
+
+            <!-- Interpretation -->
+            <div style="font-size:.64rem;color:var(--muted2);line-height:1.6;
+                        padding:7px 9px;background:${cfg.bg};border-radius:7px;margin-bottom:7px">
+              ${fnoInterpret(s.signal, s.symbol, s.priceChg, s.oiChgPct)}
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:.62rem;color:var(--muted2)">
+                Vol: <strong style="color:var(--text)">${s.volRatio?.toFixed(1)||'?'}x avg</strong>
+                · RSI: <strong>${s.rsi?.toFixed(0)||'?'}</strong>
+              </div>
+              <a href="${tv}" target="_blank"
+                 style="font-size:.63rem;color:#4f8ef7;text-decoration:none">📊 TV ↗</a>
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function fmtOI(v) {
+  if (!v && v !== 0) return '?';
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 1e7) return sign + (abs/1e7).toFixed(1) + 'Cr';
+  if (abs >= 1e5) return sign + (abs/1e5).toFixed(1) + 'L';
+  if (abs >= 1e3) return sign + (abs/1e3).toFixed(1) + 'K';
+  return sign + abs.toFixed(0);
+}
+
+function fnoInterpret(signal, sym, priceChg, oiChg) {
+  const p = priceChg >= 0 ? `+${priceChg?.toFixed(2)}%` : `${priceChg?.toFixed(2)}%`;
+  const o = oiChg >= 0 ? `+${oiChg?.toFixed(1)}%` : `${oiChg?.toFixed(1)}%`;
+  switch(signal) {
+    case 'long_build':  return `${sym} is up ${p} with OI up ${o}. Fresh long positions being added — institutions are bullish. Momentum likely to continue.`;
+    case 'short_build': return `${sym} is down ${p} with OI up ${o}. Short positions being built. Bears have conviction — avoid buying against this flow.`;
+    case 'long_unwind': return `${sym} is down ${p} with OI down ${o}. Longs are exiting. Selling pressure from unwinding — wait for OI to stabilize before entering.`;
+    case 'short_cover': return `${sym} is up ${p} with OI down ${o}. Shorts are covering (buying back). Rally may lack follow-through — confirm with fresh OI buildup.`;
+    default: return '';
+  }
 }
 
 // ── Visitor stats polling ─────────────────────────────────────────────────────

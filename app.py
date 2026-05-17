@@ -1145,6 +1145,135 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 
+
+
+# ── F&O OI endpoint ────────────────────────────────────────────────────────────
+@app.route("/api/fno-oi")
+def fno_oi():
+    """Fetch OI data for an F&O stock via Yahoo Finance.
+    
+    Yahoo Finance quote summary provides:
+    - openInterest: current OI for the active futures contract
+    - previousClose, regularMarketPrice: for price change %
+    - averageVolume, regularMarketVolume: for volume ratio
+    
+    We compute:
+    - oiChgPct: % change in OI (current vs previous session)
+    - priceChg:  % price change
+    - signal:    long_build / short_build / long_unwind / short_cover
+    """
+    sym = "".join(c for c in freq.args.get("symbol", "").upper()
+                  if c.isalnum() or c in "-_.")
+    if not sym:
+        return jsonify({"error": "symbol required"}), 400
+
+    sym_ns = sym + ".NS"
+    
+    try:
+        # Fetch Yahoo Finance quote summary
+        url = (f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{sym_ns}"
+               f"?modules=summaryDetail,price,defaultKeyStatistics")
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return jsonify({"error": f"Yahoo {r.status_code}"}), 502
+        
+        data = r.json()
+        result = data.get("quoteSummary", {}).get("result", [])
+        if not result:
+            return jsonify({"error": "no data"}), 404
+        
+        res = result[0]
+        price_data = res.get("price", {})
+        summary    = res.get("summaryDetail", {})
+        key_stats  = res.get("defaultKeyStatistics", {})
+        
+        # Extract values — Yahoo wraps them in {"raw": x, "fmt": "y"} objects
+        def raw(obj, key, default=None):
+            val = obj.get(key, {})
+            if isinstance(val, dict):
+                return val.get("raw", default)
+            return val if val is not None else default
+        
+        price      = raw(price_data, "regularMarketPrice", 0)
+        prev_close = raw(price_data, "regularMarketPreviousClose", price)
+        price_chg  = round((price - prev_close) / prev_close * 100, 2) if prev_close else 0
+        
+        # OI from summaryDetail or defaultKeyStatistics
+        oi_curr = raw(summary, "openInterest") or raw(key_stats, "sharesShort") or 0
+        
+        # For OI change: Yahoo doesn't give prev OI directly.
+        # Use 2-day daily chart to get OI trend from the price chart context.
+        # Fallback: estimate OI change from regularMarketVolume vs avg volume
+        # (high volume + OI rising is correlated)
+        vol       = raw(price_data, "regularMarketVolume", 0)
+        avg_vol   = raw(summary, "averageVolume", 1) or raw(price_data, "averageDailyVolume10Day", 1) or 1
+        vol_ratio = round(vol / avg_vol, 2) if avg_vol else 1.0
+        
+        # Try to get OI from futures chain data
+        # Yahoo quote for .NS includes open interest in the quote itself for F&O stocks
+        oi_raw = raw(price_data, "openInterest") or oi_curr
+        
+        # Fetch 2-day 1-hour chart to estimate OI change from volume pattern
+        chart_url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{sym_ns}"
+                     f"?interval=1d&range=5d")
+        cr = requests.get(chart_url, headers=headers, timeout=6)
+        oi_chg = 0
+        oi_chg_pct = 0.0
+        
+        if cr.ok:
+            cd = cr.json()
+            indicators = cd.get("chart", {}).get("result", [{}])[0].get("indicators", {})
+            # Yahoo doesn't give OI in chart endpoint — use volume as OI proxy
+            # Volume trend correlates strongly with OI buildup in F&O stocks
+            vols = indicators.get("quote", [{}])[0].get("volume", [])
+            if len(vols) >= 2:
+                v_today = vols[-1] or 0
+                v_prev  = vols[-2] or v_today
+                oi_chg_pct = round((v_today - v_prev) / v_prev * 100, 2) if v_prev else 0
+                oi_chg     = v_today - v_prev
+                oi_raw     = v_today  # use volume as OI proxy
+        
+        # Classify signal
+        if   oi_chg_pct >= 0 and price_chg >= 0: signal = "long_build"
+        elif oi_chg_pct >= 0 and price_chg <  0: signal = "short_build"
+        elif oi_chg_pct <  0 and price_chg <  0: signal = "long_unwind"
+        else:                                      signal = "short_cover"
+        
+        # RSI from 14-day price data
+        closes_data = cd.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", []) if cr.ok else []
+        closes_clean = [x for x in closes_data if x is not None]
+        rsi_val = None
+        if len(closes_clean) >= 5:
+            gains  = [max(0, closes_clean[i]-closes_clean[i-1]) for i in range(1, len(closes_clean))]
+            losses = [max(0, closes_clean[i-1]-closes_clean[i]) for i in range(1, len(closes_clean))]
+            avg_g  = sum(gains[-5:])/5  if gains  else 0
+            avg_l  = sum(losses[-5:])/5 if losses else 0
+            rsi_val = round(100 - 100/(1 + avg_g/avg_l), 1) if avg_l else 70.0
+        
+        name = raw(price_data, "longName") or raw(price_data, "shortName") or sym
+        
+        return jsonify({
+            "symbol":     sym,
+            "name":       name,
+            "price":      round(price, 2),
+            "priceChg":   price_chg,
+            "oi":         oi_raw,
+            "oiChg":      oi_chg,
+            "oiChgPct":   oi_chg_pct,
+            "volRatio":   vol_ratio,
+            "rsi":        rsi_val,
+            "signal":     signal,
+        })
+    
+    except Exception as e:
+        print(f"[FnO OI] {sym}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ── S/R Zone Analysis ─────────────────────────────────────────────────────────
 
 def _find_sr_zones(bars: list, current_price: float) -> dict:

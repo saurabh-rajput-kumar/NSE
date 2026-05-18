@@ -6925,11 +6925,14 @@ function rFnO() {
     <!-- Info box -->
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:10px;
                 padding:11px 14px;margin-bottom:14px;font-size:.67rem;color:var(--muted2);line-height:1.8">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <span>🟢 <strong style="color:var(--green)">Long Buildup</strong> — OI↑ + Price↑ · Bulls adding positions</span>
-        <span>🔴 <strong style="color:var(--red)">Short Buildup</strong> — OI↑ + Price↓ · Bears adding positions</span>
-        <span>🟡 <strong style="color:var(--yellow)">Long Unwinding</strong> — OI↓ + Price↓ · Bulls exiting longs</span>
-        <span>⚪ <strong style="color:var(--muted2)">Short Covering</strong> — OI↓ + Price↑ · Bears buying back shorts</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <span>🟢 <strong style="color:var(--green)">Long Buildup</strong> — Vol↑ + Price↑ · Fresh longs added</span>
+        <span>🔴 <strong style="color:var(--red)">Short Buildup</strong> — Vol↑ + Price↓ · Fresh shorts added</span>
+        <span>🟡 <strong style="color:var(--yellow)">Long Unwinding</strong> — Vol↓ + Price↓ · Longs exiting</span>
+        <span>⚪ <strong style="color:var(--muted2)">Short Covering</strong> — Vol↓ + Price↑ · Shorts buying back</span>
+      </div>
+      <div style="font-size:.61rem;padding-top:6px;border-top:1px solid var(--border)">
+        📌 Volume trend used as OI proxy — strongly correlated with actual F&amp;O open interest buildup
       </div>
     </div>
 
@@ -6980,25 +6983,31 @@ async function fnoScan() {
   if (resEl) resEl.innerHTML = `
     <div class="loader" style="margin:30px auto">
       <div class="spin"></div>
-      <div class="lt">Fetching OI data for ${FNO_STOCKS.length} F&O stocks…<br>
-        <span style="font-size:.63rem;color:var(--muted2)">Comparing current OI vs previous — takes ~20 seconds</span>
-      </div>
+      <div class="lt">Fetching price + volume data for ${FNO_STOCKS.length} F&O stocks…</div>
+      <div id="fno-progress" style="font-size:.63rem;color:var(--muted2);margin-top:6px">Starting…</div>
     </div>`;
 
-  // Fetch OI data in batches of 8
+  // Fetch volume/price data in batches — show partial results as they arrive
   const results = [];
-  const BATCH = 8;
+  const BATCH = 6;
   for (let i = 0; i < FNO_STOCKS.length; i += BATCH) {
     const batch = FNO_STOCKS.slice(i, i + BATCH);
     const settled = await Promise.allSettled(batch.map(sym => fnoFetchStock(sym)));
     settled.forEach(r => { if (r.status === 'fulfilled' && r.value) results.push(r.value); });
-    // Update progress
-    if (resEl) {
-      const pct = Math.round((i + BATCH) / FNO_STOCKS.length * 100);
-      resEl.querySelector('.lt') && (resEl.querySelector('.lt').innerHTML =
-        `Fetching OI data… ${Math.min(pct, 100)}% (${results.length} stocks processed)`);
+
+    const pct = Math.round((i + BATCH) / FNO_STOCKS.length * 100);
+    const progressEl = document.getElementById('fno-progress');
+    if (progressEl) {
+      progressEl.textContent = `Fetching data… ${Math.min(pct, 100)}% · ${results.length} stocks ready`;
     }
-    await new Promise(r => setTimeout(r, 200)); // small delay between batches
+    // Show partial results every 3 batches
+    if (results.length > 0 && (i / BATCH) % 3 === 2) {
+      const partialEl = document.getElementById('fno-results');
+      if (partialEl) partialEl.innerHTML = fnoRenderResults(
+        [...results].sort((a,b) => Math.abs(b.oiChgPct) - Math.abs(a.oiChgPct))
+      );
+    }
+    await new Promise(r => setTimeout(r, 150));
   }
 
   FNO_STATE.results  = results.sort((a, b) => Math.abs(b.oiChgPct) - Math.abs(a.oiChgPct));
@@ -7012,15 +7021,21 @@ async function fnoScan() {
 
 async function fnoFetchStock(sym) {
   try {
-    // Yahoo Finance quote endpoint via our proxy
-    const r = await fetch(`${PROXY_BASE}/api/fno-oi?symbol=${sym}`, {
-      signal: AbortSignal.timeout(8000),
+    const r = await fetch(`${PROXY_BASE}/api/fno-oi?symbol=${encodeURIComponent(sym)}`, {
+      signal: AbortSignal.timeout(12000),
     });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      console.warn(`[FnO] ${sym}: HTTP ${r.status}`);
+      return null;
+    }
     const d = await r.json();
-    if (!d || d.error) return null;
+    if (!d || d.error) {
+      console.warn(`[FnO] ${sym}: ${d?.error||'no data'}`);
+      return null;
+    }
     return d;
   } catch(e) {
+    console.warn(`[FnO] ${sym}: ${e.message}`);
     return null;
   }
 }
@@ -7107,7 +7122,7 @@ function fnoRenderResults(results) {
             <div style="margin-bottom:8px">
               <div style="display:flex;justify-content:space-between;font-size:.6rem;
                           color:var(--muted2);margin-bottom:3px">
-                <span>OI Change</span>
+                <span>Vol Change</span>
                 <span style="color:${s.oiChgPct>=0?'var(--green)':'var(--red)'};font-weight:700">
                   ${s.oiChgPct>=0?'+':''}${s.oiChgPct?.toFixed(1)}%
                 </span>
@@ -7126,11 +7141,11 @@ function fnoRenderResults(results) {
                 <div style="font-weight:800;color:var(--text)">₹${s.price?.toFixed(1)}</div>
               </div>
               <div style="background:var(--card3);border-radius:7px;padding:6px;text-align:center">
-                <div style="color:var(--muted2);margin-bottom:2px">Curr OI</div>
+                <div style="color:var(--muted2);margin-bottom:2px">Volume</div>
                 <div style="font-weight:800;color:${cfg.col}">${fmtOI(s.oi)}</div>
               </div>
               <div style="background:var(--card3);border-radius:7px;padding:6px;text-align:center">
-                <div style="color:var(--muted2);margin-bottom:2px">OI Chg</div>
+                <div style="color:var(--muted2);margin-bottom:2px">Vol Chg</div>
                 <div style="font-weight:800;color:${s.oiChg>=0?'var(--green)':'var(--red)'}">
                   ${s.oiChg>=0?'+':''}${fmtOI(s.oiChg)}
                 </div>

@@ -4543,12 +4543,55 @@ let NF_STATE = { tf: '15min', loading: false, result: null };
 function rNifty() {
   const area = document.getElementById('area');
   area.innerHTML = `
-    <div class="sh">🇮🇳 Nifty Intraday Strategy
+    <div class="sh">🇮🇳 Nifty Intraday
       <div class="sh-line"></div>
-      <span style="font-size:.63rem;color:var(--muted2)">AI-powered · FVG · SMC · Price Action</span>
+      <span style="font-size:.63rem;color:var(--muted2)">5-Min Body Expansion · AI Strategy · FVG · SMC</span>
     </div>
 
+    <!-- ── 5-Min Body Expansion Strategy (pinned at top) ── -->
+    <div style="background:linear-gradient(135deg,rgba(255,107,53,.1),rgba(240,180,41,.08));
+                border:1px solid rgba(255,107,53,.3);border-radius:14px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:1">
+          <div style="font-size:.84rem;font-weight:800;color:var(--text)">⚡ 5-Min Body Expansion Signal</div>
+          <div style="font-size:.65rem;color:var(--muted2);margin-top:2px">
+            Fires when current 5-min candle body > max body of last 5 candles · Entry on close
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <select id="nf5-sym" class="c" style="font-size:.72rem;padding:5px 8px">
+            <option value="^NSEI">NIFTY 50</option>
+            <option value="^NSEBANK">NIFTY BANK</option>
+            <option value="NIFTY_FIN_SERVICE.NS">FIN SERVICE</option>
+          </select>
+          <button onclick="nf5Fetch()" id="nf5-btn"
+            style="background:linear-gradient(135deg,#ff6b35,#f0b429);color:#fff;border:none;
+                   padding:6px 14px;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer">
+            ⚡ Get Signal
+          </button>
+        </div>
+      </div>
+
+      <!-- Auto-refresh toggle -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:.68rem;color:var(--muted2);cursor:pointer">
+          <input type="checkbox" id="nf5-auto" onchange="nf5ToggleAuto(this.checked)" style="cursor:pointer"/>
+          Auto-refresh every 5 min (market hours 9:15–15:30 IST)
+        </label>
+        <span id="nf5-next-refresh" style="font-size:.62rem;color:var(--muted2)"></span>
+      </div>
+
+      <!-- Signal result area -->
+      <div id="nf5-result">
+        <div style="font-size:.7rem;color:var(--muted2);text-align:center;padding:12px">
+          Click <strong>⚡ Get Signal</strong> to check current 5-min setup
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AI Strategy + FVG/SMC Analysis (below) ── -->
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:14px">
+      <div style="font-size:.76rem;font-weight:700;color:var(--text);margin-bottom:10px">📐 AI Intraday Strategy</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
         <div>
           <label style="font-size:.6rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Instrument</label>
@@ -4574,12 +4617,11 @@ function rNifty() {
         <button onclick="nfRefresh()" id="nf-ref-btn"
           style="background:rgba(0,212,154,.15);color:var(--green);border:1px solid rgba(0,212,154,.3);
                  padding:8px 14px;border-radius:10px;font-size:.78rem;font-weight:600;cursor:pointer">
-          ↻ Refresh Signal
+          ↻ Refresh
         </button>
       </div>
       <div style="font-size:.64rem;color:var(--muted2);margin-top:8px;line-height:1.6">
-        Analyzes last 3–6 months of price action · Detects FVG, SMC order blocks, EMA confluence, candlestick patterns
-        · Gemini identifies active setup · Returns entry/SL/T1/T2/T3 with trailing stop
+        FVG · SMC order blocks · EMA confluence · Candlestick patterns · Gemini AI commentary
       </div>
     </div>
 
@@ -7191,6 +7233,265 @@ function fnoInterpret(signal, sym, priceChg, oiChg) {
     case 'short_cover': return `${sym} is up ${p} with OI down ${o}. Shorts are covering (buying back). Rally may lack follow-through — confirm with fresh OI buildup.`;
     default: return '';
   }
+}
+
+
+// ── 5-MIN BODY EXPANSION SIGNAL ───────────────────────────────────────────────
+let NF5_TIMER = null;
+let NF5_COUNTDOWN = null;
+
+async function nf5Fetch() {
+  const sym   = document.getElementById('nf5-sym')?.value || '^NSEI';
+  const resEl = document.getElementById('nf5-result');
+  const btn   = document.getElementById('nf5-btn');
+  if (!resEl) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Fetching…'; }
+  resEl.innerHTML = `<div style="font-size:.7rem;color:var(--muted2);padding:10px">
+    ⏳ Fetching latest 5-min candles for ${sym.replace('^','')}…</div>`;
+
+  try {
+    const r = await fetch(
+      `${PROXY_BASE}/api/nifty-5min-signal?symbol=${encodeURIComponent(sym)}`,
+      { signal: AbortSignal.timeout(20000) }
+    );
+    const data = await r.json();
+    if (data.error) {
+      resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${data.error}</div>`;
+    } else {
+      resEl.innerHTML = nf5RenderResult(data);
+    }
+  } catch(e) {
+    resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${e.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Get Signal'; }
+  }
+}
+
+function nf5ToggleAuto(enabled) {
+  // Clear existing timers
+  if (NF5_TIMER)     { clearInterval(NF5_TIMER);     NF5_TIMER = null; }
+  if (NF5_COUNTDOWN) { clearInterval(NF5_COUNTDOWN); NF5_COUNTDOWN = null; }
+
+  const nextEl = document.getElementById('nf5-next-refresh');
+  if (!enabled) { if (nextEl) nextEl.textContent = ''; return; }
+
+  // Fetch immediately
+  nf5Fetch();
+
+  // Then every 5 minutes — but only during NSE market hours (9:15–15:30 IST)
+  const INTERVAL_MS = 5 * 60 * 1000;
+  let nextRefreshAt  = Date.now() + INTERVAL_MS;
+
+  NF5_TIMER = setInterval(() => {
+    // Check if within market hours (IST = UTC+5:30)
+    const now    = new Date();
+    const istOff = 5.5 * 60 * 60 * 1000;
+    const ist    = new Date(now.getTime() + istOff);
+    const h = ist.getUTCHours(), m = ist.getUTCMinutes();
+    const mins   = h * 60 + m;
+    const isWeekday = ist.getUTCDay() >= 1 && ist.getUTCDay() <= 5;
+    const inMarket  = isWeekday && mins >= 555 && mins <= 930; // 9:15–15:30
+
+    if (inMarket) {
+      nf5Fetch();
+      nextRefreshAt = Date.now() + INTERVAL_MS;
+    }
+  }, INTERVAL_MS);
+
+  // Countdown display
+  NF5_COUNTDOWN = setInterval(() => {
+    const secsLeft = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+    const m = Math.floor(secsLeft / 60), s = secsLeft % 60;
+    if (nextEl) nextEl.textContent = `Next refresh in ${m}:${s.toString().padStart(2,'0')}`;
+  }, 1000);
+}
+
+function nf5RenderResult(data) {
+  const sig  = data.signal;
+  const ctx  = data.recent_context || [];
+  const atr  = data.atr;
+  const curr = data.current_price;
+
+  // ── No signal ───────────────────────────────────────────────────────────────
+  if (!sig || sig.direction === 'NONE') {
+    const lc = data.latest_candle;
+    const needed = lc ? (lc.prev_max_body - lc.body).toFixed(2) : '?';
+    return `
+      <div style="background:rgba(120,120,140,.08);border:1px solid var(--border);border-radius:10px;padding:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:1.1rem">⏸️</span>
+          <div>
+            <div style="font-size:.78rem;font-weight:700;color:var(--text)">No Signal — Waiting for Expansion</div>
+            <div style="font-size:.65rem;color:var(--muted2)">Current price: ₹${curr}</div>
+          </div>
+        </div>
+        ${lc ? `
+        <div style="display:flex;gap:10px;font-size:.67rem;flex-wrap:wrap;margin-bottom:8px">
+          <span>Last body: <strong style="color:var(--text)">₹${lc.body}</strong></span>
+          <span>Prev max body: <strong style="color:var(--yellow)">₹${lc.prev_max_body}</strong></span>
+          <span>Need ₹<strong style="color:var(--yellow)">${needed}</strong> more body to signal</span>
+        </div>` : ''}
+        ${nf5MiniChart(ctx, null)}
+        <div style="font-size:.63rem;color:var(--muted2);margin-top:8px">
+          Signal fires when next candle body > ₹${lc?.prev_max_body || '?'} (current 5-bar max)
+        </div>
+      </div>`;
+  }
+
+  // ── Signal found ─────────────────────────────────────────────────────────────
+  const isBull   = sig.direction === 'BUY';
+  const col      = isBull ? 'var(--green)' : 'var(--red)';
+  const bgcol    = isBull ? 'rgba(0,212,154,' : 'rgba(255,69,96,';
+  const emoji    = isBull ? '📈' : '📉';
+  const todaySig = data.signal_count_today || 1;
+
+  return `
+    <!-- Signal Header -->
+    <div style="background:${bgcol}.12);border:1px solid ${col}30;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="font-size:1.4rem">${emoji}</div>
+        <div style="flex:1">
+          <div style="font-size:.9rem;font-weight:800;color:${col}">
+            ${sig.direction} SIGNAL — Body Expansion
+          </div>
+          <div style="font-size:.65rem;color:var(--muted2);margin-top:2px">
+            ${sig.time} · Body ₹${sig.body} vs prev max ₹${sig.prev_max_body} · ${sig.expansion}× expansion
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.84rem;font-weight:800;color:var(--yellow)">${sig.confidence}%</div>
+          <div style="font-size:.59rem;color:var(--muted2)">confidence</div>
+        </div>
+      </div>
+
+      <!-- Expansion bar -->
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:.62rem;color:var(--muted2);margin-bottom:3px">
+          <span>Body expansion vs prev 5 candles</span>
+          <span style="color:${col};font-weight:700">${sig.expansion}× bigger</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${Math.min(sig.expansion/3*100,100)}%;
+                      background:${col};border-radius:3px"></div>
+        </div>
+      </div>
+
+      <!-- Trade levels: 3-column grid -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
+        <div style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.25);
+                    border-radius:8px;padding:9px;text-align:center">
+          <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:3px">Entry (close)</div>
+          <div style="font-size:.92rem;font-weight:800;color:#4f8ef7">₹${sig.entry}</div>
+          <div style="font-size:.58rem;color:var(--muted2)">on candle close</div>
+        </div>
+        <div style="background:rgba(255,69,96,.12);border:1px solid rgba(255,69,96,.25);
+                    border-radius:8px;padding:9px;text-align:center">
+          <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:3px">Stop Loss</div>
+          <div style="font-size:.92rem;font-weight:800;color:var(--red)">₹${sig.sl}</div>
+          <div style="font-size:.58rem;color:var(--muted2)">
+            ${isBull ? 'candle low −0.2 ATR' : 'candle high +0.2 ATR'}
+          </div>
+        </div>
+        <div style="background:rgba(0,212,154,.12);border:1px solid rgba(0,212,154,.25);
+                    border-radius:8px;padding:9px;text-align:center">
+          <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:3px">Risk</div>
+          <div style="font-size:.92rem;font-weight:800;color:var(--yellow)">₹${sig.risk}</div>
+          <div style="font-size:.58rem;color:var(--muted2)">per unit</div>
+        </div>
+      </div>
+
+      <!-- Targets row -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+        <div style="background:${bgcol}.08);border:1px solid ${col}20;border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:.57rem;color:var(--muted2);margin-bottom:2px">T1 — 1:2</div>
+          <div style="font-size:.82rem;font-weight:800;color:${col}">₹${sig.t1}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">Move SL to entry here</div>
+        </div>
+        <div style="background:${bgcol}.06);border:1px solid ${col}18;border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:.57rem;color:var(--muted2);margin-bottom:2px">T2 — 1:3</div>
+          <div style="font-size:.82rem;font-weight:800;color:${col}">₹${sig.t2}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">Book partial here</div>
+        </div>
+        <div style="background:${bgcol}.04);border:1px solid ${col}15;border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:.57rem;color:var(--muted2);margin-bottom:2px">T3 — 1:5</div>
+          <div style="font-size:.82rem;font-weight:800;color:${col}">₹${sig.t3}</div>
+          <div style="font-size:.57rem;color:var(--muted2)">Let runners ride</div>
+        </div>
+      </div>
+
+      <!-- Trail method -->
+      <div style="background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);
+                  border-radius:8px;padding:8px;font-size:.66rem;color:var(--muted2);margin-bottom:8px">
+        🔄 <strong style="color:var(--yellow)">Trailing Stop:</strong> ${sig.trail_method}
+      </div>
+
+      <!-- Signal candle detail -->
+      <div style="font-size:.64rem;color:var(--muted2);line-height:1.7;border-top:1px solid ${col}20;padding-top:8px">
+        Signal candle: O ₹${sig.candle.o} · H ₹${sig.candle.h} · L ₹${sig.candle.l} · C ₹${sig.candle.c}
+        · Body ₹${sig.body} · ATR ₹${sig.atr}
+        · ${todaySig} signal${todaySig > 1 ? 's' : ''} fired today
+      </div>
+    </div>
+
+    <!-- Mini candle chart -->
+    ${nf5MiniChart(ctx, sig)}`;
+}
+
+function nf5MiniChart(ctx, sig) {
+  if (!ctx || !ctx.length) return '';
+
+  const maxH = Math.max(...ctx.map(b => b.h));
+  const minL = Math.min(...ctx.map(b => b.l));
+  const priceRange = maxH - minL || 1;
+  const chartH = 60;
+
+  // Find the signal bar index in context
+  const sigIdx = sig ? ctx.findIndex(b => b.time === sig.time) : -1;
+
+  const bars = ctx.map((b, i) => {
+    const isSignal = i === sigIdx;
+    const isBull   = b.bull;
+    const col      = isSignal ? (isBull ? '#00ff88' : '#ff4560') :
+                     isBull ? 'var(--green)' : 'var(--red)';
+    const opacity  = isSignal ? 1 : 0.55;
+
+    // Scale to chart height
+    const hPct  = ((maxH - b.h) / priceRange * chartH).toFixed(1);
+    const lPct  = ((maxH - b.l) / priceRange * chartH).toFixed(1);
+    const oPct  = ((maxH - Math.max(b.o, b.c)) / priceRange * chartH).toFixed(1);
+    const cPct  = ((maxH - Math.min(b.o, b.c)) / priceRange * chartH).toFixed(1);
+    const bodyH = Math.max(2, cPct - oPct);
+
+    return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;position:relative;height:${chartH}px">
+      <!-- Wick -->
+      <div style="position:absolute;left:50%;transform:translateX(-50%);width:1px;
+                  top:${hPct}px;height:${+lPct - +hPct}px;background:${col};opacity:${opacity}"></div>
+      <!-- Body -->
+      <div style="position:absolute;left:50%;transform:translateX(-50%);width:8px;
+                  top:${oPct}px;height:${bodyH}px;background:${col};border-radius:1px;opacity:${opacity};
+                  ${isSignal ? 'box-shadow:0 0 6px ' + col + ';' : ''}"></div>
+      <!-- Signal marker -->
+      ${isSignal ? `<div style="position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);
+                    font-size:.6rem;color:${col}">▲</div>` : ''}
+    </div>`;
+  });
+
+  const timeLabel = sig ? sig.time.slice(-5) : (ctx[ctx.length-1]?.time.slice(-5) || '');
+  return `
+    <div style="background:var(--card3);border-radius:8px;padding:10px 8px 16px">
+      <div style="font-size:.62rem;color:var(--muted2);margin-bottom:6px">
+        Last ${ctx.length} candles · ${sig ? `Signal: <span style="color:var(--accent)">${timeLabel}</span>` : 'No signal yet'}
+      </div>
+      <div style="display:flex;gap:2px;align-items:flex-end;height:${chartH}px">
+        ${bars.join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.58rem;
+                  color:var(--muted2);margin-top:16px">
+        <span>₹${minL.toFixed(1)}</span>
+        <span>₹${maxH.toFixed(1)}</span>
+      </div>
+    </div>`;
 }
 
 // ── Visitor stats polling ─────────────────────────────────────────────────────

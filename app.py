@@ -1268,6 +1268,180 @@ def fno_oi():
         return jsonify({"error": str(e)}), 500
 
 
+
+
+# ── Nifty 5-Min Range Expansion Signal ───────────────────────────────────────
+
+@app.route("/api/nifty-5min-signal")
+def nifty_5min_signal():
+    """
+    Body Expansion Breakout on 5-min candles.
+
+    Rules (user-defined):
+    - Measure = body size = abs(close - open) of each candle
+    - Look back = last 5 completed candles
+    - Signal fires when current completed candle body > max body of prior 5 candles
+    - Direction: bullish close (c > o) → BUY, bearish close (c < o) → SELL
+    - Entry: on close of signal candle (market order next bar open in practice)
+    - SL: low of signal candle (BUY) or high (SELL), extended 0.2x ATR for buffer
+    - T1: entry + 2 * risk  (1:2 R:R)
+    - T2: entry + 3 * risk  (1:3 R:R)
+    - T3: entry + 5 * risk  (1:5 R:R)
+    - Trail: move SL to entry after T1 hit, then trail 1 ATR below each new high
+    """
+    sym = freq.args.get("symbol", "^NSEI").strip()
+
+    # Fetch last 7 days of 5-min data (Yahoo gives up to 60d for 5m)
+    raw = fetch_yahoo(sym, interval="5m", range_="7d")
+    if not raw:
+        return jsonify({"error": f"Could not fetch 5-min data for {sym}"}), 404
+
+    bars = _parse_ohlcv(raw, sym)
+    if len(bars) < 8:
+        return jsonify({"error": f"Insufficient 5-min bars ({len(bars)})"}), 400
+
+    # Strip incomplete (current) candle — only use fully closed bars
+    bars = bars[:-1]
+    n    = len(bars)
+
+    closes  = [b["c"] for b in bars]
+    opens   = [b["o"] for b in bars]
+    highs   = [b["h"] for b in bars]
+    lows    = [b["l"] for b in bars]
+    times   = [b["d"] for b in bars]
+
+    # Body sizes (absolute)
+    bodies = [abs(closes[i] - opens[i]) for i in range(n)]
+
+    # ATR(14) for SL buffer and trailing
+    atr_vals = []
+    for i in range(1, n):
+        atr_vals.append(max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i-1]),
+            abs(lows[i]  - closes[i-1])
+        ))
+    atr = sum(atr_vals[-14:]) / min(14, len(atr_vals)) if atr_vals else closes[-1] * 0.002
+
+    # ── Scan for signals in last 30 bars ─────────────────────────────────────
+    signals  = []
+    LOOKBACK = 5   # compare against last 5 candles
+
+    for i in range(LOOKBACK, n):
+        body_i    = bodies[i]
+        prev_max  = max(bodies[i - LOOKBACK : i])   # max body of prior 5 candles
+
+        if body_i <= prev_max:
+            continue   # not bigger — skip
+
+        direction = "BUY"  if closes[i] > opens[i] else "SELL"
+        entry     = closes[i]
+
+        # SL: candle extreme + small ATR buffer
+        if direction == "BUY":
+            sl    = round(lows[i]  - atr * 0.2, 2)
+        else:
+            sl    = round(highs[i] + atr * 0.2, 2)
+
+        risk = abs(entry - sl)
+        if risk <= 0:
+            continue
+
+        t1 = round(entry + (2 * risk if direction == "BUY" else -2 * risk), 2)
+        t2 = round(entry + (3 * risk if direction == "BUY" else -3 * risk), 2)
+        t3 = round(entry + (5 * risk if direction == "BUY" else -5 * risk), 2)
+
+        # Expansion ratio: how much bigger vs prior max
+        expansion = round(body_i / prev_max, 2) if prev_max > 0 else 0
+
+        # Confidence: bigger expansion + aligns with recent trend = stronger
+        recent_trend = closes[i] > closes[max(0, i-10)]  # up vs 10 bars ago
+        conf = 60
+        if expansion >= 1.5: conf += 15
+        if expansion >= 2.0: conf += 10
+        if (direction == "BUY"  and recent_trend):  conf += 10
+        if (direction == "SELL" and not recent_trend): conf += 10
+        conf = min(95, conf)
+
+        signals.append({
+            "bar_idx":   i,
+            "time":      times[i],
+            "direction": direction,
+            "entry":     round(entry, 2),
+            "sl":        round(sl, 2),
+            "t1":        t1,
+            "t2":        t2,
+            "t3":        t3,
+            "risk":      round(risk, 2),
+            "rr1":       2.0,
+            "rr2":       3.0,
+            "rr3":       5.0,
+            "body":      round(body_i, 2),
+            "prev_max_body": round(prev_max, 2),
+            "expansion": expansion,
+            "confidence":conf,
+            "atr":       round(atr, 2),
+            "trail_method": f"Move SL to entry after T1. Then trail {round(atr,1)} pts (1 ATR) below each new high.",
+            "candle": {
+                "o": round(opens[i],  2),
+                "h": round(highs[i],  2),
+                "l": round(lows[i],   2),
+                "c": round(closes[i], 2),
+            },
+        })
+
+    if not signals:
+        # Return latest candle context even if no signal
+        latest = {
+            "bar_idx":    n - 1,
+            "time":       times[-1],
+            "direction":  "NONE",
+            "entry":      round(closes[-1], 2),
+            "body":       round(bodies[-1], 2),
+            "prev_max_body": round(max(bodies[-6:-1]), 2) if n >= 6 else 0,
+            "expansion":  round(bodies[-1] / max(bodies[-6:-1], default=1), 2) if n >= 6 else 0,
+            "atr":        round(atr, 2),
+            "confidence": 0,
+        }
+        return jsonify({
+            "symbol":       sym,
+            "bars_fetched": n,
+            "atr":          round(atr, 2),
+            "current_price":round(closes[-1], 2),
+            "signal":       None,
+            "latest_candle":latest,
+            "recent_context": _build_context(bars[-8:], bodies[-8:]),
+        })
+
+    # Return most recent signal + last 8 bars for context chart
+    latest_sig = signals[-1]
+    return jsonify({
+        "symbol":         sym,
+        "bars_fetched":   n,
+        "atr":            round(atr, 2),
+        "current_price":  round(closes[-1], 2),
+        "signal":         latest_sig,
+        "recent_context": _build_context(bars[-8:], bodies[-8:]),
+        "signal_count_today": len([s for s in signals if s["time"][:10] == times[-1][:10]]),
+    })
+
+
+def _build_context(bars, bodies):
+    """Build last-8-candles summary for the mini chart."""
+    return [
+        {
+            "time":  b["d"],
+            "o":     round(b["o"], 2),
+            "h":     round(b["h"], 2),
+            "l":     round(b["l"], 2),
+            "c":     round(b["c"], 2),
+            "body":  round(bodies[i], 2),
+            "bull":  b["c"] >= b["o"],
+        }
+        for i, b in enumerate(bars)
+    ]
+
+
 # ── S/R Zone Analysis ─────────────────────────────────────────────────────────
 
 def _find_sr_zones(bars: list, current_price: float) -> dict:

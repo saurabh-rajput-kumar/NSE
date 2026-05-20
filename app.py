@@ -1442,6 +1442,302 @@ def _build_context(bars, bodies):
     ]
 
 
+
+# ── 5-Min Body Expansion — Full Backtest ─────────────────────────────────────
+
+@app.route("/api/nifty-5min-backtest")
+def nifty_5min_backtest():
+    """
+    Backtest the 5-min body expansion strategy on 60 days of data.
+
+    Exact rules (as specified):
+    - Signal : current candle body > max body of prior 5 candles
+    - Entry  : close of signal candle
+    - SL     : candle LOW  (BUY)  or HIGH (SELL) — no ATR buffer, exact candle extreme
+    - Min R:R : 1:2 — exit at entry ± 2×risk if target hit
+    - After T1: trail SL to each subsequent candle LOW (BUY) or HIGH (SELL)
+                i.e. SL is updated every bar to max(prev_SL, new_candle_low) for BUY
+                     and updated every bar to min(prev_SL, new_candle_high) for SELL
+    - Forced exit: end of trading day (15:25 IST) — no overnight holds
+    - One trade at a time — no re-entry until current trade closes
+
+    Returns per-trade log + aggregate stats.
+    """
+    sym   = freq.args.get("symbol", "^NSEI").strip()
+    range_ = freq.args.get("range", "60d")
+    if range_ not in ("30d", "60d"):
+        range_ = "60d"
+
+    raw = fetch_yahoo(sym, interval="5m", range_=range_)
+    if not raw:
+        return jsonify({"error": f"Could not fetch 5-min data for {sym}"}), 404
+
+    bars = _parse_ohlcv(raw, sym)
+    if len(bars) < 20:
+        return jsonify({"error": f"Insufficient bars ({len(bars)})"}), 400
+
+    # Drop last (potentially incomplete) candle
+    bars = bars[:-1]
+    n    = len(bars)
+
+    closes = [b["c"] for b in bars]
+    opens  = [b["o"] for b in bars]
+    highs  = [b["h"] for b in bars]
+    lows   = [b["l"] for b in bars]
+    times  = [b["d"] for b in bars]
+
+    bodies = [abs(closes[i] - opens[i]) for i in range(n)]
+
+    LOOKBACK = 5
+
+    # ── Per-day grouping for end-of-day forced exit ───────────────────────────
+    # Extract date portion from timestamp string
+    def bar_date(t):
+        # t looks like "2024-11-25 09:15:00+05:30" or "2024-11-25T09:15:00"
+        return t[:10]
+
+    def bar_time_mins(t):
+        """Return minutes since midnight IST."""
+        # strip timezone, parse HH:MM
+        try:
+            t_clean = t.replace("T", " ").split("+")[0].split(".")[0]
+            parts   = t_clean.split(" ")
+            if len(parts) >= 2:
+                h, m = int(parts[1][:2]), int(parts[1][3:5])
+            else:
+                h, m = 15, 25
+            return h * 60 + m
+        except Exception:
+            return 15 * 60 + 25   # default: EOD
+
+    EOD_MINS = 15 * 60 + 25   # 15:25 IST forced exit
+
+    # ── Run backtest ──────────────────────────────────────────────────────────
+    trades   = []
+    in_trade = False
+    trade    = {}
+
+    for i in range(LOOKBACK, n):
+        t_mins = bar_time_mins(times[i])
+        t_date = bar_date(times[i])
+
+        # ── Close open trade at EOD ───────────────────────────────────────────
+        if in_trade and (t_date != trade["entry_date"] or t_mins >= EOD_MINS):
+            trade["exit_price"]  = closes[i]
+            trade["exit_time"]   = times[i]
+            trade["exit_reason"] = "EOD"
+            trade["pnl"]         = round(
+                (closes[i] - trade["entry"]) if trade["direction"] == "BUY"
+                else (trade["entry"] - closes[i]), 2
+            )
+            trade["pnl_r"]       = round(trade["pnl"] / trade["risk"], 2) if trade["risk"] else 0
+            trade["outcome"]     = "WIN" if trade["pnl"] > 0 else "LOSS"
+            trades.append(trade)
+            in_trade = False
+            trade    = {}
+
+        # Don't open new trades in last 30 mins (EOD chop)
+        if t_mins >= EOD_MINS - 30:
+            continue
+
+        # ── Manage open trade ─────────────────────────────────────────────────
+        if in_trade:
+            direction = trade["direction"]
+            entry     = trade["entry"]
+            sl        = trade["sl"]
+            t1        = trade["t1"]
+            t1_hit    = trade["t1_hit"]
+
+            # Check SL hit (on this candle's low/high)
+            sl_hit = (lows[i] <= sl  if direction == "BUY"
+                      else highs[i] >= sl)
+            # Check T1 hit
+            t1_hit_now = (highs[i] >= t1 if direction == "BUY"
+                          else lows[i]  <= t1)
+
+            if sl_hit and not t1_hit:
+                # Stopped out before T1
+                trade["exit_price"]  = sl
+                trade["exit_time"]   = times[i]
+                trade["exit_reason"] = "SL"
+                trade["pnl"]         = round(
+                    (sl - entry) if direction == "BUY" else (entry - sl), 2
+                )
+                trade["pnl_r"]   = round(trade["pnl"] / trade["risk"], 2) if trade["risk"] else 0
+                trade["outcome"] = "LOSS"
+                trades.append(trade)
+                in_trade = False
+                trade    = {}
+                continue
+
+            # T1 hit — move SL to entry, then start trailing
+            if t1_hit_now and not t1_hit:
+                trade["t1_hit"] = True
+                # Move SL to breakeven (entry)
+                trade["sl"]     = entry
+
+            # After T1: trail SL to each candle's low/high
+            if trade["t1_hit"]:
+                if direction == "BUY":
+                    # Ratchet SL up to current candle low (only move up, never down)
+                    new_trail = lows[i]
+                    if new_trail > trade["sl"]:
+                        trade["sl"] = new_trail
+                else:
+                    # Ratchet SL down to current candle high (only move down, never up)
+                    new_trail = highs[i]
+                    if new_trail < trade["sl"]:
+                        trade["sl"] = new_trail
+
+                # Check if trailed SL hit
+                sl_hit_trail = (lows[i] <= trade["sl"]  if direction == "BUY"
+                                else highs[i] >= trade["sl"])
+                if sl_hit_trail:
+                    trade["exit_price"]  = trade["sl"]
+                    trade["exit_time"]   = times[i]
+                    trade["exit_reason"] = "TRAIL"
+                    trade["pnl"]         = round(
+                        (trade["sl"] - entry) if direction == "BUY"
+                        else (entry - trade["sl"]), 2
+                    )
+                    trade["pnl_r"]   = round(trade["pnl"] / trade["risk"], 2) if trade["risk"] else 0
+                    trade["outcome"] = "WIN"   # trail exit after T1 = always profitable
+                    trades.append(trade)
+                    in_trade = False
+                    trade    = {}
+
+            continue   # skip signal scan while in trade
+
+        # ── Scan for new signal ───────────────────────────────────────────────
+        body_i   = bodies[i]
+        prev_max = max(bodies[i - LOOKBACK : i])
+
+        if body_i <= prev_max:
+            continue
+
+        direction = "BUY" if closes[i] > opens[i] else "SELL"
+        entry     = closes[i]
+
+        # SL = exact candle extreme (no buffer — as per user spec)
+        sl = lows[i]  if direction == "BUY" else highs[i]
+        risk = abs(entry - sl)
+        if risk < 0.5:   # too small — skip (likely a doji)
+            continue
+
+        t1 = round(entry + (2 * risk if direction == "BUY" else -2 * risk), 2)
+
+        expansion = round(body_i / prev_max, 2) if prev_max > 0 else 0
+
+        in_trade = True
+        trade    = {
+            "entry_bar":   i,
+            "entry_time":  times[i],
+            "entry_date":  bar_date(times[i]),
+            "direction":   direction,
+            "entry":       round(entry, 2),
+            "sl":          round(sl,    2),
+            "t1":          t1,
+            "risk":        round(risk,  2),
+            "expansion":   expansion,
+            "body":        round(body_i, 2),
+            "prev_max":    round(prev_max, 2),
+            "t1_hit":      False,
+            # will be filled on exit:
+            "exit_price":  None,
+            "exit_time":   None,
+            "exit_reason": None,
+            "pnl":         None,
+            "pnl_r":       None,
+            "outcome":     None,
+        }
+
+    # Close any still-open trade at end of data
+    if in_trade:
+        trade["exit_price"]  = closes[-1]
+        trade["exit_time"]   = times[-1]
+        trade["exit_reason"] = "DATA_END"
+        trade["pnl"]         = round(
+            (closes[-1] - trade["entry"]) if trade["direction"] == "BUY"
+            else (trade["entry"] - closes[-1]), 2
+        )
+        trade["pnl_r"]   = round(trade["pnl"] / trade["risk"], 2) if trade["risk"] else 0
+        trade["outcome"] = "WIN" if trade["pnl"] > 0 else "LOSS"
+        trades.append(trade)
+
+    # ── Compute aggregate stats ───────────────────────────────────────────────
+    total       = len(trades)
+    wins        = [t for t in trades if t["outcome"] == "WIN"]
+    losses      = [t for t in trades if t["outcome"] == "LOSS"]
+    win_rate    = round(len(wins) / total * 100, 1) if total else 0
+    avg_win_r   = round(sum(t["pnl_r"] for t in wins)   / len(wins),   2) if wins   else 0
+    avg_loss_r  = round(sum(t["pnl_r"] for t in losses) / len(losses), 2) if losses else 0
+    total_r     = round(sum(t["pnl_r"] for t in trades), 2)
+    max_dd_r    = _max_drawdown_r(trades)
+
+    # By exit reason
+    sl_exits    = len([t for t in trades if t["exit_reason"] == "SL"])
+    trail_exits = len([t for t in trades if t["exit_reason"] == "TRAIL"])
+    eod_exits   = len([t for t in trades if t["exit_reason"] == "EOD"])
+
+    # By direction
+    buys  = [t for t in trades if t["direction"] == "BUY"]
+    sells = [t for t in trades if t["direction"] == "SELL"]
+
+    # Daily PnL for equity curve
+    daily_pnl: dict = {}
+    for t in trades:
+        d = t["entry_date"]
+        daily_pnl[d] = round(daily_pnl.get(d, 0) + (t["pnl_r"] or 0), 2)
+
+    equity_curve = []
+    cumulative   = 0.0
+    for d in sorted(daily_pnl):
+        cumulative = round(cumulative + daily_pnl[d], 2)
+        equity_curve.append({"date": d, "daily_r": daily_pnl[d], "cumulative_r": cumulative})
+
+    return jsonify({
+        "symbol":       sym,
+        "range":        range_,
+        "bars_tested":  n,
+        "date_from":    bar_date(times[0]),
+        "date_to":      bar_date(times[-1]),
+        "stats": {
+            "total_trades":  total,
+            "wins":          len(wins),
+            "losses":        len(losses),
+            "win_rate":      win_rate,
+            "total_r":       total_r,
+            "avg_win_r":     avg_win_r,
+            "avg_loss_r":    avg_loss_r,
+            "expectancy_r":  round(win_rate/100 * avg_win_r + (1 - win_rate/100) * avg_loss_r, 3),
+            "max_drawdown_r":max_dd_r,
+            "sl_exits":      sl_exits,
+            "trail_exits":   trail_exits,
+            "eod_exits":     eod_exits,
+            "buy_trades":    len(buys),
+            "sell_trades":   len(sells),
+            "buy_win_rate":  round(len([t for t in buys  if t["outcome"]=="WIN"])/len(buys) *100,1) if buys  else 0,
+            "sell_win_rate": round(len([t for t in sells if t["outcome"]=="WIN"])/len(sells)*100,1) if sells else 0,
+        },
+        "trades":        trades[-60:],   # last 60 trades for display
+        "equity_curve":  equity_curve,
+    })
+
+
+def _max_drawdown_r(trades):
+    """Maximum peak-to-trough drawdown in R units."""
+    if not trades:
+        return 0
+    peak = 0.0
+    dd   = 0.0
+    cum  = 0.0
+    for t in trades:
+        cum  += t["pnl_r"] or 0
+        peak  = max(peak, cum)
+        dd    = max(dd, peak - cum)
+    return round(dd, 2)
+
+
 # ── S/R Zone Analysis ─────────────────────────────────────────────────────────
 
 def _find_sr_zones(bars: list, current_price: float) -> dict:

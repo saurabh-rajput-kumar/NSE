@@ -4589,6 +4589,33 @@ function rNifty() {
       </div>
     </div>
 
+    <!-- ── Backtest Section ── -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:1">
+          <div style="font-size:.78rem;font-weight:800;color:var(--text)">📊 Strategy Backtest</div>
+          <div style="font-size:.64rem;color:var(--muted2);margin-top:2px">
+            Same signal · exact SL/trail rules · 1:2 min · 30 or 60 days of 5-min data
+          </div>
+        </div>
+        <select id="nf5-bt-range" class="c" style="font-size:.72rem;padding:5px 8px">
+          <option value="60d">60 days</option>
+          <option value="30d">30 days</option>
+        </select>
+        <button onclick="nf5RunBacktest()" id="nf5-bt-btn"
+          style="background:linear-gradient(135deg,#6c63ff,#4f8ef7);color:#fff;border:none;
+                 padding:6px 16px;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer">
+          📊 Run Backtest
+        </button>
+      </div>
+      <div id="nf5-bt-result">
+        <div style="font-size:.68rem;color:var(--muted2)">
+          Select 30d or 60d above and click <strong>Run Backtest</strong>.
+          Simulates every body-expansion signal with exact trailing stop rules.
+        </div>
+      </div>
+    </div>
+
     <!-- ── AI Strategy + FVG/SMC Analysis (below) ── -->
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:14px">
       <div style="font-size:.76rem;font-weight:700;color:var(--text);margin-bottom:10px">📐 AI Intraday Strategy</div>
@@ -7494,6 +7521,212 @@ function nf5MiniChart(ctx, sig) {
     </div>`;
 }
 
+
+// ── 5-MIN BACKTEST UI ─────────────────────────────────────────────────────────
+let NF5_BT_STATE = { loading: false, data: null };
+
+async function nf5RunBacktest() {
+  const sym   = document.getElementById('nf5-sym')?.value || '^NSEI';
+  const range = document.getElementById('nf5-bt-range')?.value || '60d';
+  const resEl = document.getElementById('nf5-bt-result');
+  const btn   = document.getElementById('nf5-bt-btn');
+  if (!resEl) return;
+
+  NF5_BT_STATE.loading = true;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Backtesting…'; }
+  resEl.innerHTML = `<div style="font-size:.7rem;color:var(--muted2);padding:12px;text-align:center">
+    ⏳ Running backtest on ${range} of 5-min data for ${sym.replace('^','')}…<br>
+    <span style="font-size:.63rem">Simulating every signal · Exact entry/SL/trail rules</span>
+  </div>`;
+
+  try {
+    const r = await fetch(
+      `${PROXY_BASE}/api/nifty-5min-backtest?symbol=${encodeURIComponent(sym)}&range=${range}`,
+      { signal: AbortSignal.timeout(60000) }
+    );
+    const data = await r.json();
+    if (data.error) {
+      resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${data.error}</div>`;
+    } else {
+      NF5_BT_STATE.data = data;
+      resEl.innerHTML = nf5RenderBacktest(data);
+    }
+  } catch(e) {
+    resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${e.message}</div>`;
+  } finally {
+    NF5_BT_STATE.loading = false;
+    if (btn) { btn.disabled = false; btn.textContent = '📊 Run Backtest'; }
+  }
+}
+
+function nf5RenderBacktest(data) {
+  const s  = data.stats;
+  const eq = data.equity_curve || [];
+  const tr = data.trades || [];
+
+  // Stats color helpers
+  const wrCol  = s.win_rate >= 55 ? 'var(--green)' : s.win_rate >= 45 ? 'var(--yellow)' : 'var(--red)';
+  const rCol   = s.total_r  >= 0  ? 'var(--green)' : 'var(--red)';
+  const expCol = s.expectancy_r > 0 ? 'var(--green)' : 'var(--red)';
+
+  // Equity curve SVG
+  const eqSVG = nf5EquityCurve(eq);
+
+  // Trade log (last 30)
+  const tradeLog = tr.slice(-30).reverse().map(t => {
+    const isWin  = t.outcome === 'WIN';
+    const col    = isWin ? 'var(--green)' : 'var(--red)';
+    const dirCol = t.direction === 'BUY' ? 'var(--green)' : 'var(--red)';
+    const exitIcon = t.exit_reason === 'SL' ? '🛑' : t.exit_reason === 'TRAIL' ? '🔄' : '🕐';
+    return `
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 0;
+                  border-bottom:1px solid var(--border);font-size:.63rem;flex-wrap:wrap">
+        <span style="min-width:70px;color:var(--muted2)">${t.entry_time?.slice(5,16)||''}</span>
+        <span style="color:${dirCol};font-weight:700;min-width:30px">${t.direction}</span>
+        <span style="color:var(--muted2)">E:₹${t.entry} SL:₹${t.sl?.toFixed(1)} T1:₹${t.t1}</span>
+        <span style="margin-left:auto">${exitIcon}
+          <strong style="color:${col}">
+            ${t.pnl_r >= 0 ? '+' : ''}${t.pnl_r?.toFixed(2)}R
+          </strong>
+          <span style="color:var(--muted2);margin-left:4px">${t.exit_reason}</span>
+        </span>
+      </div>`;
+  }).join('');
+
+  return `
+    <!-- Header stats summary -->
+    <div style="background:var(--card3);border:1px solid var(--border);border-radius:10px;
+                padding:12px;margin-bottom:12px">
+      <div style="font-size:.72rem;font-weight:800;color:var(--text);margin-bottom:10px">
+        📊 Backtest Results · ${data.symbol} · ${data.date_from} → ${data.date_to}
+        <span style="font-size:.62rem;font-weight:400;color:var(--muted2);margin-left:6px">
+          ${data.bars_tested?.toLocaleString()} bars tested
+        </span>
+      </div>
+
+      <!-- Primary stats grid -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+        <div style="background:var(--card);border-radius:9px;padding:10px;text-align:center">
+          <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:4px">Win Rate</div>
+          <div style="font-size:1.3rem;font-weight:800;color:${wrCol}">${s.win_rate}%</div>
+          <div style="font-size:.6rem;color:var(--muted2)">${s.wins}W / ${s.losses}L</div>
+        </div>
+        <div style="background:var(--card);border-radius:9px;padding:10px;text-align:center">
+          <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:4px">Total P&L</div>
+          <div style="font-size:1.3rem;font-weight:800;color:${rCol}">
+            ${s.total_r >= 0 ? '+' : ''}${s.total_r}R
+          </div>
+          <div style="font-size:.6rem;color:var(--muted2)">${s.total_trades} trades</div>
+        </div>
+        <div style="background:var(--card);border-radius:9px;padding:10px;text-align:center">
+          <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:4px">Expectancy</div>
+          <div style="font-size:1.3rem;font-weight:800;color:${expCol}">
+            ${s.expectancy_r >= 0 ? '+' : ''}${s.expectancy_r?.toFixed(3)}R
+          </div>
+          <div style="font-size:.6rem;color:var(--muted2)">per trade</div>
+        </div>
+      </div>
+
+      <!-- Secondary stats row -->
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:.66rem;margin-bottom:8px">
+        <span>Avg Win: <strong style="color:var(--green)">+${s.avg_win_r}R</strong></span>
+        <span>Avg Loss: <strong style="color:var(--red)">${s.avg_loss_r}R</strong></span>
+        <span>Max DD: <strong style="color:var(--red)">${s.max_drawdown_r}R</strong></span>
+        <span>SL exits: <strong style="color:var(--text)">${s.sl_exits}</strong></span>
+        <span>Trail exits: <strong style="color:var(--green)">${s.trail_exits}</strong></span>
+        <span>EOD exits: <strong style="color:var(--muted2)">${s.eod_exits}</strong></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:.64rem">
+        <span>BUY trades: <strong>${s.buy_trades}</strong>
+          · WR <strong style="color:${s.buy_win_rate>=50?'var(--green)':'var(--red)'}">${s.buy_win_rate}%</strong>
+        </span>
+        <span>SELL trades: <strong>${s.sell_trades}</strong>
+          · WR <strong style="color:${s.sell_win_rate>=50?'var(--green)':'var(--red)'}">${s.sell_win_rate}%</strong>
+        </span>
+      </div>
+    </div>
+
+    <!-- Equity curve -->
+    ${eq.length >= 3 ? `
+    <div style="background:var(--card3);border:1px solid var(--border);border-radius:10px;
+                padding:12px;margin-bottom:12px">
+      <div style="font-size:.67rem;font-weight:700;color:var(--text);margin-bottom:8px">
+        📈 Equity Curve (cumulative R)
+      </div>
+      ${eqSVG}
+    </div>` : ''}
+
+    <!-- Trade log -->
+    <div style="background:var(--card3);border:1px solid var(--border);border-radius:10px;padding:12px">
+      <div style="font-size:.67rem;font-weight:700;color:var(--text);margin-bottom:6px">
+        📋 Last ${Math.min(tr.length,30)} Trades
+        <span style="font-size:.6rem;font-weight:400;color:var(--muted2);margin-left:6px">
+          🛑 SL hit · 🔄 Trail exit · 🕐 End of day
+        </span>
+      </div>
+      ${tradeLog || '<div style="font-size:.68rem;color:var(--muted2)">No trades in this period.</div>'}
+    </div>
+
+    <!-- Rules reminder -->
+    <div style="font-size:.62rem;color:var(--muted2);margin-top:10px;line-height:1.7;
+                padding:8px 10px;background:var(--card3);border-radius:8px">
+      <strong style="color:var(--text)">Rules tested:</strong>
+      Signal = body > max of prior 5 candles ·
+      SL = candle low (BUY) / high (SELL) ·
+      T1 = 1:2 R:R · After T1: trail SL to each candle low/high ·
+      Forced close at 15:25 IST · One trade at a time
+    </div>`;
+}
+
+function nf5EquityCurve(eq) {
+  if (!eq || eq.length < 2) return '';
+  const vals  = eq.map(e => e.cumulative_r);
+  const dates = eq.map(e => e.date.slice(5));  // MM-DD
+  const minV  = Math.min(...vals, 0);
+  const maxV  = Math.max(...vals, 0);
+  const range = maxV - minV || 1;
+  const W = 300, H = 80, PAD = 4;
+
+  // Build SVG polyline
+  const pts = vals.map((v, i) => {
+    const x = PAD + (i / (vals.length - 1)) * (W - PAD * 2);
+    const y = H - PAD - ((v - minV) / range) * (H - PAD * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  // Zero line y position
+  const zeroY = (H - PAD - ((0 - minV) / range) * (H - PAD * 2)).toFixed(1);
+
+  // Color: green if positive, red if negative overall
+  const lineCol = vals[vals.length-1] >= 0 ? '#00d49a' : '#ff4560';
+
+  // First and last date labels
+  const firstDate = dates[0] || '';
+  const lastDate  = dates[dates.length - 1] || '';
+  const lastVal   = vals[vals.length - 1];
+
+  return `<div style="overflow-x:auto">
+    <svg viewBox="0 0 ${W} ${H+20}" width="100%" style="max-width:100%;display:block">
+      <!-- Zero line -->
+      <line x1="${PAD}" y1="${zeroY}" x2="${W-PAD}" y2="${zeroY}"
+            stroke="var(--border)" stroke-width="1" stroke-dasharray="3,3"/>
+      <!-- Equity line -->
+      <polyline points="${pts}" fill="none" stroke="${lineCol}" stroke-width="2"
+                stroke-linejoin="round" stroke-linecap="round"/>
+      <!-- Fill below/above zero -->
+      <polyline points="${PAD},${zeroY} ${pts} ${W-PAD},${zeroY}"
+                fill="${lineCol}" fill-opacity="0.08" stroke="none"/>
+      <!-- Labels -->
+      <text x="${PAD}" y="${H+14}" font-size="9" fill="var(--muted2)">${firstDate}</text>
+      <text x="${W-PAD}" y="${H+14}" font-size="9" fill="var(--muted2)"
+            text-anchor="end">${lastDate}</text>
+      <text x="${W-PAD}" y="${parseFloat(zeroY)-4}" font-size="9"
+            fill="${lineCol}" text-anchor="end" font-weight="bold">
+        ${lastVal >= 0 ? '+' : ''}${lastVal.toFixed(1)}R
+      </text>
+    </svg>
+  </div>`;
+}
 // ── Visitor stats polling ─────────────────────────────────────────────────────
 async function pollVisitors() {
   try {

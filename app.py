@@ -1316,8 +1316,7 @@ def nifty_5min_signal():
 
     def to_ist_str(ts):
         """Convert Unix timestamp to IST datetime string."""
-        import datetime
-        dt = datetime.datetime.utcfromtimestamp(ts + IST_OFF)
+        dt = datetime.utcfromtimestamp(ts + IST_OFF)
         return dt.strftime("%Y-%m-%d %H:%M")
 
     # Build display times in IST
@@ -1477,9 +1476,9 @@ def nifty_5min_backtest():
     Returns per-trade log + aggregate stats.
     """
     sym   = freq.args.get("symbol", "^NSEI").strip()
-    range_ = freq.args.get("range", "60d")
+    range_ = freq.args.get("range", "30d")
     if range_ not in ("30d", "60d"):
-        range_ = "60d"
+        range_ = "30d"
 
     raw = fetch_yahoo(sym, interval="5m", range_=range_)
     if not raw:
@@ -1508,20 +1507,17 @@ def nifty_5min_backtest():
 
     def ist_mins(ts):
         """Return minutes since midnight IST from a Unix timestamp."""
-        import datetime
-        dt = datetime.datetime.utcfromtimestamp(ts + IST_OFF)
+        dt = datetime.utcfromtimestamp(ts + IST_OFF)
         return dt.hour * 60 + dt.minute
 
     def ist_date(ts):
         """Return IST date string YYYY-MM-DD from Unix timestamp."""
-        import datetime
-        dt = datetime.datetime.utcfromtimestamp(ts + IST_OFF)
+        dt = datetime.utcfromtimestamp(ts + IST_OFF)
         return dt.strftime("%Y-%m-%d")
 
     def ist_str(ts):
         """Full IST datetime string for display."""
-        import datetime
-        dt = datetime.datetime.utcfromtimestamp(ts + IST_OFF)
+        dt = datetime.utcfromtimestamp(ts + IST_OFF)
         return dt.strftime("%Y-%m-%d %H:%M")
 
     # ── Run backtest ──────────────────────────────────────────────────────────
@@ -1696,7 +1692,7 @@ def nifty_5min_backtest():
     sells = [t for t in trades if t["direction"] == "SELL"]
 
     # Daily PnL for equity curve
-    daily_pnl: dict = {}
+    daily_pnl = {}
     for t in trades:
         d = t.get("entry_date", t.get("entry_time","")[:10])
         daily_pnl[d] = round(daily_pnl.get(d, 0) + (t["pnl_r"] or 0), 2)

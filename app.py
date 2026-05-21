@@ -1308,7 +1308,20 @@ def nifty_5min_signal():
     opens   = [b["o"] for b in bars]
     highs   = [b["h"] for b in bars]
     lows    = [b["l"] for b in bars]
-    times   = [b["d"] for b in bars]
+    times   = [b["t"] for b in bars]   # Unix timestamps for accurate IST time
+    dates   = [b["d"] for b in bars]   # date strings for display
+
+    # IST = UTC + 5h30m
+    IST_OFF = int(5.5 * 3600)
+
+    def to_ist_str(ts):
+        """Convert Unix timestamp to IST datetime string."""
+        import datetime
+        dt = datetime.datetime.utcfromtimestamp(ts + IST_OFF)
+        return dt.strftime("%Y-%m-%d %H:%M")
+
+    # Build display times in IST
+    display_times = [to_ist_str(t) for t in times]
 
     # Body sizes (absolute)
     bodies = [abs(closes[i] - opens[i]) for i in range(n)]
@@ -1365,7 +1378,7 @@ def nifty_5min_signal():
 
         signals.append({
             "bar_idx":   i,
-            "time":      times[i],
+            "time":      display_times[i],
             "direction": direction,
             "entry":     round(entry, 2),
             "sl":        round(sl, 2),
@@ -1394,7 +1407,7 @@ def nifty_5min_signal():
         # Return latest candle context even if no signal
         latest = {
             "bar_idx":    n - 1,
-            "time":       times[-1],
+            "time":       display_times[-1],
             "direction":  "NONE",
             "entry":      round(closes[-1], 2),
             "body":       round(bodies[-1], 2),
@@ -1422,7 +1435,7 @@ def nifty_5min_signal():
         "current_price":  round(closes[-1], 2),
         "signal":         latest_sig,
         "recent_context": _build_context(bars[-8:], bodies[-8:]),
-        "signal_count_today": len([s for s in signals if s["time"][:10] == times[-1][:10]]),
+        "signal_count_today": len([s for s in signals if s["time"][:10] == display_times[-1][:10]]),
     })
 
 
@@ -1430,7 +1443,7 @@ def _build_context(bars, bodies):
     """Build last-8-candles summary for the mini chart."""
     return [
         {
-            "time":  b["d"],
+            "time":  to_ist_str(b["t"]) if "t" in b else b["d"],
             "o":     round(b["o"], 2),
             "h":     round(b["h"], 2),
             "l":     round(b["l"], 2),
@@ -1484,33 +1497,32 @@ def nifty_5min_backtest():
     opens  = [b["o"] for b in bars]
     highs  = [b["h"] for b in bars]
     lows   = [b["l"] for b in bars]
-    times  = [b["d"] for b in bars]
+    unix_t = [b["t"] for b in bars]   # raw Unix timestamps
+    dates  = [b["d"] for b in bars]   # date strings (UTC date — used for grouping)
 
     bodies = [abs(closes[i] - opens[i]) for i in range(n)]
 
     LOOKBACK = 5
+    IST_OFF  = int(5.5 * 3600)   # UTC → IST offset in seconds
+    EOD_MINS = 15 * 60 + 25      # 15:25 IST = forced exit
 
-    # ── Per-day grouping for end-of-day forced exit ───────────────────────────
-    # Extract date portion from timestamp string
-    def bar_date(t):
-        # t looks like "2024-11-25 09:15:00+05:30" or "2024-11-25T09:15:00"
-        return t[:10]
+    def ist_mins(ts):
+        """Return minutes since midnight IST from a Unix timestamp."""
+        import datetime
+        dt = datetime.datetime.utcfromtimestamp(ts + IST_OFF)
+        return dt.hour * 60 + dt.minute
 
-    def bar_time_mins(t):
-        """Return minutes since midnight IST."""
-        # strip timezone, parse HH:MM
-        try:
-            t_clean = t.replace("T", " ").split("+")[0].split(".")[0]
-            parts   = t_clean.split(" ")
-            if len(parts) >= 2:
-                h, m = int(parts[1][:2]), int(parts[1][3:5])
-            else:
-                h, m = 15, 25
-            return h * 60 + m
-        except Exception:
-            return 15 * 60 + 25   # default: EOD
+    def ist_date(ts):
+        """Return IST date string YYYY-MM-DD from Unix timestamp."""
+        import datetime
+        dt = datetime.datetime.utcfromtimestamp(ts + IST_OFF)
+        return dt.strftime("%Y-%m-%d")
 
-    EOD_MINS = 15 * 60 + 25   # 15:25 IST forced exit
+    def ist_str(ts):
+        """Full IST datetime string for display."""
+        import datetime
+        dt = datetime.datetime.utcfromtimestamp(ts + IST_OFF)
+        return dt.strftime("%Y-%m-%d %H:%M")
 
     # ── Run backtest ──────────────────────────────────────────────────────────
     trades   = []
@@ -1518,8 +1530,8 @@ def nifty_5min_backtest():
     trade    = {}
 
     for i in range(LOOKBACK, n):
-        t_mins = bar_time_mins(times[i])
-        t_date = bar_date(times[i])
+        t_mins = ist_mins(unix_t[i])
+        t_date = ist_date(unix_t[i])
 
         # ── Close open trade at EOD ───────────────────────────────────────────
         if in_trade and (t_date != trade["entry_date"] or t_mins >= EOD_MINS):
@@ -1558,7 +1570,7 @@ def nifty_5min_backtest():
             if sl_hit and not t1_hit:
                 # Stopped out before T1
                 trade["exit_price"]  = sl
-                trade["exit_time"]   = times[i]
+                trade["exit_time"]   = ist_str(unix_t[i])
                 trade["exit_reason"] = "SL"
                 trade["pnl"]         = round(
                     (sl - entry) if direction == "BUY" else (entry - sl), 2
@@ -1594,7 +1606,7 @@ def nifty_5min_backtest():
                                 else highs[i] >= trade["sl"])
                 if sl_hit_trail:
                     trade["exit_price"]  = trade["sl"]
-                    trade["exit_time"]   = times[i]
+                    trade["exit_time"]   = ist_str(unix_t[i])
                     trade["exit_reason"] = "TRAIL"
                     trade["pnl"]         = round(
                         (trade["sl"] - entry) if direction == "BUY"
@@ -1631,8 +1643,8 @@ def nifty_5min_backtest():
         in_trade = True
         trade    = {
             "entry_bar":   i,
-            "entry_time":  times[i],
-            "entry_date":  bar_date(times[i]),
+            "entry_time":  ist_str(unix_t[i]),
+            "entry_date":  ist_date(unix_t[i]),
             "direction":   direction,
             "entry":       round(entry, 2),
             "sl":          round(sl,    2),
@@ -1654,7 +1666,7 @@ def nifty_5min_backtest():
     # Close any still-open trade at end of data
     if in_trade:
         trade["exit_price"]  = closes[-1]
-        trade["exit_time"]   = times[-1]
+        trade["exit_time"]   = ist_str(unix_t[-1])
         trade["exit_reason"] = "DATA_END"
         trade["pnl"]         = round(
             (closes[-1] - trade["entry"]) if trade["direction"] == "BUY"
@@ -1686,7 +1698,7 @@ def nifty_5min_backtest():
     # Daily PnL for equity curve
     daily_pnl: dict = {}
     for t in trades:
-        d = t["entry_date"]
+        d = t.get("entry_date", t.get("entry_time","")[:10])
         daily_pnl[d] = round(daily_pnl.get(d, 0) + (t["pnl_r"] or 0), 2)
 
     equity_curve = []
@@ -1699,8 +1711,8 @@ def nifty_5min_backtest():
         "symbol":       sym,
         "range":        range_,
         "bars_tested":  n,
-        "date_from":    bar_date(times[0]),
-        "date_to":      bar_date(times[-1]),
+        "date_from":    ist_date(unix_t[0]),
+        "date_to":      ist_date(unix_t[-1]),
         "stats": {
             "total_trades":  total,
             "wins":          len(wins),

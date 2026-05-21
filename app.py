@@ -1146,6 +1146,24 @@ if __name__ == "__main__":
 
 
 
+@app.route("/api/chart-5m")
+def chart_5m():
+    """Lightweight proxy: fetch 5-min bars for a symbol. No computation — just streams raw Yahoo data.
+    Frontend does all backtest computation to avoid Render timeout.
+    """
+    sym   = "".join(c for c in freq.args.get("symbol", "^NSEI").upper()
+                    if c.isalnum() or c in "-_.%^")
+    range_ = freq.args.get("range", "30d")
+    if range_ not in ("5d", "30d", "60d"):
+        range_ = "30d"
+    # For index symbols like ^NSEI don't append .NS
+    if not sym.startswith("^") and not sym.endswith(".NS"):
+        sym = sym + ".NS"
+    data = fetch_yahoo(sym, interval="5m", range_=range_)
+    if not data:
+        return jsonify({"error": f"Could not fetch 5-min data for {sym}"}), 502
+    return Response(data, mimetype="application/json")
+
 
 # ── F&O OI endpoint ────────────────────────────────────────────────────────────
 @app.route("/api/fno-oi")

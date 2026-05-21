@@ -7275,21 +7275,39 @@ async function nf5Fetch() {
 
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Fetching…'; }
   resEl.innerHTML = `<div style="font-size:.7rem;color:var(--muted2);padding:10px">
-    ⏳ Fetching latest 5-min candles for ${sym.replace('^','')}…</div>`;
+    ⏳ Fetching 5-min candles for ${sym.replace('^','')}…</div>`;
 
   try {
+    // Lightweight proxy — no server computation, just raw Yahoo data
     const r = await fetch(
-      `${PROXY_BASE}/api/nifty-5min-signal?symbol=${encodeURIComponent(sym)}`,
-      { signal: AbortSignal.timeout(20000) }
+      `${PROXY_BASE}/api/chart-5m?symbol=${encodeURIComponent(sym)}&range=5d`,
+      { signal: AbortSignal.timeout(15000) }
     );
-    const data = await r.json();
-    if (data.error) {
-      resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${data.error}</div>`;
-    } else {
-      resEl.innerHTML = nf5RenderResult(data);
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('json')) {
+      resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:10px;line-height:1.7">
+        ❌ Server not ready. Wait 30 seconds (Render cold start) and retry.</div>`;
+      return;
     }
+    const raw = await r.json();
+    if (raw.error) {
+      resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${raw.error}</div>`;
+      return;
+    }
+    // Parse bars and compute signal in browser
+    const bars = nf5ParseBars(raw);
+    if (bars.length < 8) {
+      resEl.innerHTML = `<div style="color:var(--yellow);font-size:.7rem;padding:8px">
+        ⚠️ Only ${bars.length} bars returned. Market may be closed.</div>`;
+      return;
+    }
+    const result = nf5ComputeSignal(bars, sym);
+    resEl.innerHTML = nf5RenderResult(result);
   } catch(e) {
-    resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${e.message}</div>`;
+    const msg = (e.name==='TimeoutError'||e.name==='AbortError')
+      ? 'Timed out — Render may be waking up. Wait 30s and retry.'
+      : e.message;
+    resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${msg}</div>`;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '⚡ Get Signal'; }
   }
@@ -7527,52 +7545,60 @@ let NF5_BT_STATE = { loading: false, data: null };
 
 async function nf5RunBacktest() {
   const sym   = document.getElementById('nf5-sym')?.value || '^NSEI';
-  const range = document.getElementById('nf5-bt-range')?.value || '60d';
+  const range = document.getElementById('nf5-bt-range')?.value || '30d';
   const resEl = document.getElementById('nf5-bt-result');
   const btn   = document.getElementById('nf5-bt-btn');
   if (!resEl) return;
 
   NF5_BT_STATE.loading = true;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Backtesting…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Fetching data…'; }
   resEl.innerHTML = `<div style="font-size:.7rem;color:var(--muted2);padding:12px;text-align:center">
-    ⏳ Running backtest on ${range} of 5-min data for ${sym.replace('^','')}…<br>
-    <span style="font-size:.63rem">Simulating every signal · Exact entry/SL/trail rules</span>
+    ⏳ Fetching ${range} of 5-min data… <span style="font-size:.62rem">(backtest runs in browser)</span>
   </div>`;
 
   try {
     const r = await fetch(
-      `${PROXY_BASE}/api/nifty-5min-backtest?symbol=${encodeURIComponent(sym)}&range=${range}`,
-      { signal: AbortSignal.timeout(55000) }
+      `${PROXY_BASE}/api/chart-5m?symbol=${encodeURIComponent(sym)}&range=${range}`,
+      { signal: AbortSignal.timeout(20000) }
     );
-    // Check content-type — if HTML returned it means server error/timeout
     const ct = r.headers.get('content-type') || '';
     if (!ct.includes('json')) {
       resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:10px;line-height:1.7">
-        ❌ Server returned an error page instead of data.<br>
-        <span style="color:var(--muted2)">This usually means Render timed out (free tier limit).
-        Try selecting <strong>30 days</strong> instead of 60, or wait 30 seconds and retry.</span>
-      </div>`;
+        ❌ Server not ready (Render cold start). Wait 30 seconds and retry.</div>`;
       return;
     }
-    const data = await r.json();
-    if (data.error) {
-      resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${data.error}</div>`;
-    } else {
-      NF5_BT_STATE.data = data;
-      resEl.innerHTML = nf5RenderBacktest(data);
+    const raw = await r.json();
+    if (raw.error) {
+      resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:8px">❌ ${raw.error}</div>`;
+      return;
     }
+
+    if (btn) btn.textContent = '⏳ Running backtest…';
+    resEl.innerHTML = `<div style="font-size:.7rem;color:var(--muted2);padding:8px;text-align:center">
+      ⚙️ Computing backtest results…</div>`;
+    await new Promise(r => setTimeout(r, 10));
+
+    const bars = nf5ParseBars(raw);
+    if (bars.length < 20) {
+      resEl.innerHTML = `<div style="color:var(--yellow);font-size:.7rem;padding:8px">
+        ⚠️ Only ${bars.length} bars returned. Try a shorter range.</div>`;
+      return;
+    }
+
+    const result = nf5ComputeBacktest(bars, sym, range);
+    NF5_BT_STATE.data = result;
+    resEl.innerHTML = nf5RenderBacktest(result);
   } catch(e) {
-    const msg = e.name === 'TimeoutError' || e.name === 'AbortError'
-      ? 'Request timed out — try 30 days instead of 60, or retry in a moment.'
+    const msg = (e.name==='TimeoutError'||e.name==='AbortError')
+      ? 'Data fetch timed out. Render waking up — wait 30s and retry.'
       : e.message;
-    resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:10px;line-height:1.7">
-      ❌ ${msg}
-    </div>`;
+    resEl.innerHTML = `<div style="color:var(--red);font-size:.7rem;padding:10px">❌ ${msg}</div>`;
   } finally {
     NF5_BT_STATE.loading = false;
     if (btn) { btn.disabled = false; btn.textContent = '📊 Run Backtest'; }
   }
 }
+
 
 function nf5RenderBacktest(data) {
   const s  = data.stats;
@@ -7742,6 +7768,240 @@ function nf5EquityCurve(eq) {
     </svg>
   </div>`;
 }
+
+// ── 5-MIN SHARED JS COMPUTATION (no server timeout risk) ─────────────────────
+const IST_OFF_MS = 5.5 * 3600 * 1000;  // UTC→IST in milliseconds
+
+function nf5ISTMins(ts) {
+  const d = new Date((ts * 1000) + IST_OFF_MS);
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
+}
+function nf5ISTDate(ts) {
+  return new Date((ts * 1000) + IST_OFF_MS).toISOString().slice(0, 10);
+}
+function nf5ISTStr(ts) {
+  return new Date((ts * 1000) + IST_OFF_MS).toISOString().slice(0, 16).replace('T', ' ');
+}
+
+// Parse Yahoo Finance raw chart JSON into flat bar array
+function nf5ParseBars(raw) {
+  try {
+    const res = raw?.chart?.result?.[0];
+    if (!res) return [];
+    const timestamps = res.timestamp || [];
+    const q = res.indicators?.quote?.[0] || {};
+    const bars = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const cv = q.close?.[i];
+      if (!cv || cv <= 0) continue;
+      bars.push({
+        t: timestamps[i],
+        o: q.open?.[i]   || cv,
+        h: q.high?.[i]   || cv,
+        l: q.low?.[i]    || cv,
+        c: cv,
+        v: q.volume?.[i] || 0,
+      });
+    }
+    return bars.slice(0, -1);  // drop last (may be incomplete)
+  } catch(e) { console.error('nf5ParseBars:', e); return []; }
+}
+
+// Compute live signal from latest bars
+function nf5ComputeSignal(bars, sym) {
+  const LOOKBACK = 5;
+  const n = bars.length;
+  const bodies = bars.map(b => Math.abs(b.c - b.o));
+
+  // ATR (14 bars)
+  let atrSum = 0, atrCount = 0;
+  for (let i = Math.max(1, n-14); i < n; i++) {
+    atrSum += Math.max(bars[i].h - bars[i].l,
+      Math.abs(bars[i].h - bars[i-1].c),
+      Math.abs(bars[i].l - bars[i-1].c));
+    atrCount++;
+  }
+  const atr = atrCount ? +(atrSum / atrCount).toFixed(2) : +(bars[n-1].c * 0.002).toFixed(2);
+
+  // Scan last 30 bars for signals
+  const signals = [];
+  for (let i = LOOKBACK; i < n; i++) {
+    const bodyI   = bodies[i];
+    const prevMax = Math.max(...bodies.slice(i - LOOKBACK, i));
+    if (bodyI <= prevMax) continue;
+
+    const dir   = bars[i].c > bars[i].o ? 'BUY' : 'SELL';
+    const entry = bars[i].c;
+    const sl    = dir === 'BUY' ? +(bars[i].l - atr*0.2).toFixed(2)
+                                : +(bars[i].h + atr*0.2).toFixed(2);
+    const risk  = Math.abs(entry - sl);
+    if (risk <= 0) continue;
+
+    const exp  = prevMax > 0 ? +(bodyI/prevMax).toFixed(2) : 0;
+    const recentTrend = bars[i].c > bars[Math.max(0,i-10)].c;
+    let conf = 60;
+    if (exp >= 1.5) conf += 15;
+    if (exp >= 2.0) conf += 10;
+    if ((dir==='BUY' && recentTrend) || (dir==='SELL' && !recentTrend)) conf += 10;
+    conf = Math.min(95, conf);
+
+    signals.push({
+      bar_idx: i, time: nf5ISTStr(bars[i].t), direction: dir,
+      entry: +entry.toFixed(2), sl: +sl.toFixed(2),
+      t1: +(entry + (dir==='BUY'?2:-2)*risk).toFixed(2),
+      t2: +(entry + (dir==='BUY'?3:-3)*risk).toFixed(2),
+      t3: +(entry + (dir==='BUY'?5:-5)*risk).toFixed(2),
+      risk: +risk.toFixed(2), rr1:2, rr2:3, rr3:5,
+      body: +bodyI.toFixed(2), prev_max_body: +prevMax.toFixed(2),
+      expansion: exp, confidence: conf, atr,
+      trail_method: `Move SL to entry after T1. Then trail ${atr} pts (1 ATR) below each new high.`,
+      candle: { o:+bars[i].o.toFixed(2), h:+bars[i].h.toFixed(2),
+                l:+bars[i].l.toFixed(2), c:+bars[i].c.toFixed(2) },
+    });
+  }
+
+  // Build context (last 8 bars)
+  const ctx = bars.slice(-8).map(b => ({
+    time: nf5ISTStr(b.t), o:+b.o.toFixed(2), h:+b.h.toFixed(2),
+    l:+b.l.toFixed(2), c:+b.c.toFixed(2),
+    body:+(Math.abs(b.c-b.o)).toFixed(2), bull: b.c >= b.o,
+  }));
+
+  const today = nf5ISTDate(bars[n-1].t);
+  const sig   = signals.length ? signals[signals.length-1] : null;
+
+  return {
+    symbol: sym, bars_fetched: n, atr, current_price: +bars[n-1].c.toFixed(2),
+    signal: sig,
+    latest_candle: sig ? null : {
+      body:        +bodies[n-1].toFixed(2),
+      prev_max_body: +(Math.max(...bodies.slice(n-1-LOOKBACK, n-1))).toFixed(2),
+    },
+    recent_context: ctx,
+    signal_count_today: signals.filter(s => s.time?.slice(0,10) === today).length,
+  };
+}
+
+// Full backtest — runs entirely in browser
+function nf5ComputeBacktest(bars, sym, range) {
+  const EOD_MINS  = 15 * 60 + 25;
+  const NO_ENTRY  = EOD_MINS - 30;
+  const LOOKBACK  = 5;
+  const n         = bars.length;
+  const bodies    = bars.map(b => Math.abs(b.c - b.o));
+  const trades    = [];
+  let inTrade     = false, trade = null;
+
+  for (let i = LOOKBACK; i < n; i++) {
+    const tMins = nf5ISTMins(bars[i].t);
+    const tDate = nf5ISTDate(bars[i].t);
+
+    // Force close at EOD
+    if (inTrade && (tDate !== trade.entryDate || tMins >= EOD_MINS)) {
+      const p = bars[i].c;
+      const pnl = trade.dir==='BUY' ? p-trade.entry : trade.entry-p;
+      trades.push({...trade, exitPrice:+p.toFixed(2), exitTime:nf5ISTStr(bars[i].t),
+        exitReason:'EOD', pnl:+pnl.toFixed(2), pnlR:+(pnl/trade.risk).toFixed(2),
+        outcome: pnl>0?'WIN':'LOSS'});
+      inTrade=false; trade=null;
+    }
+    if (tMins >= NO_ENTRY) continue;
+
+    if (inTrade) {
+      const b = bars[i];
+      const slHit = trade.dir==='BUY' ? b.l<=trade.sl : b.h>=trade.sl;
+      if (slHit && !trade.t1Hit) {
+        const pnl = trade.dir==='BUY' ? trade.sl-trade.entry : trade.entry-trade.sl;
+        trades.push({...trade, exitPrice:trade.sl, exitTime:nf5ISTStr(b.t),
+          exitReason:'SL', pnl:+pnl.toFixed(2), pnlR:+(pnl/trade.risk).toFixed(2), outcome:'LOSS'});
+        inTrade=false; trade=null; continue;
+      }
+      const t1Hit = trade.dir==='BUY' ? b.h>=trade.t1 : b.l<=trade.t1;
+      if (t1Hit && !trade.t1Hit) { trade.t1Hit=true; trade.sl=trade.entry; }
+      if (trade.t1Hit) {
+        if (trade.dir==='BUY')  { if (b.l > trade.sl) trade.sl=+b.l.toFixed(2); }
+        else                    { if (b.h < trade.sl) trade.sl=+b.h.toFixed(2); }
+        const trailHit = trade.dir==='BUY' ? b.l<=trade.sl : b.h>=trade.sl;
+        if (trailHit) {
+          const pnl = trade.dir==='BUY' ? trade.sl-trade.entry : trade.entry-trade.sl;
+          trades.push({...trade, exitPrice:trade.sl, exitTime:nf5ISTStr(b.t),
+            exitReason:'TRAIL', pnl:+pnl.toFixed(2), pnlR:+(pnl/trade.risk).toFixed(2), outcome:'WIN'});
+          inTrade=false; trade=null;
+        }
+      }
+      continue;
+    }
+
+    // Signal
+    const bodyI   = bodies[i];
+    const prevMax = Math.max(...bodies.slice(i-LOOKBACK, i));
+    if (bodyI <= prevMax) continue;
+    const dir   = bars[i].c > bars[i].o ? 'BUY' : 'SELL';
+    const entry = bars[i].c;
+    const sl    = dir==='BUY' ? bars[i].l : bars[i].h;
+    const risk  = Math.abs(entry-sl);
+    if (risk < 0.5) continue;
+    inTrade=true;
+    trade={
+      entryBar:i, entryTime:nf5ISTStr(bars[i].t), entryDate:tDate,
+      dir, entry:+entry.toFixed(2), sl:+sl.toFixed(2),
+      t1:+(entry+(dir==='BUY'?2:-2)*risk).toFixed(2),
+      risk:+risk.toFixed(2), expansion:prevMax>0?+(bodyI/prevMax).toFixed(2):0,
+      body:+bodyI.toFixed(2), prevMax:+prevMax.toFixed(2), t1Hit:false,
+    };
+  }
+  if (inTrade && trade) {
+    const p = bars[n-1].c;
+    const pnl = trade.dir==='BUY' ? p-trade.entry : trade.entry-p;
+    trades.push({...trade, exitPrice:+p.toFixed(2), exitTime:nf5ISTStr(bars[n-1].t),
+      exitReason:'DATA_END', pnl:+pnl.toFixed(2), pnlR:+(pnl/trade.risk).toFixed(2),
+      outcome:pnl>0?'WIN':'LOSS'});
+  }
+
+  // Stats
+  const wins   = trades.filter(t=>t.outcome==='WIN');
+  const losses = trades.filter(t=>t.outcome==='LOSS');
+  const total  = trades.length;
+  const wr     = total ? +(wins.length/total*100).toFixed(1) : 0;
+  const avgW   = wins.length   ? +(wins.reduce((a,t)=>a+t.pnlR,0)/wins.length).toFixed(2)     : 0;
+  const avgL   = losses.length ? +(losses.reduce((a,t)=>a+t.pnlR,0)/losses.length).toFixed(2) : 0;
+  const totR   = +(trades.reduce((a,t)=>a+t.pnlR,0)).toFixed(2);
+  const expR   = +(wr/100*avgW + (1-wr/100)*avgL).toFixed(3);
+  let peak=0, dd=0, cum=0;
+  trades.forEach(t=>{cum+=t.pnlR; peak=Math.max(peak,cum); dd=Math.max(dd,peak-cum);});
+
+  const dailyPnl={};
+  trades.forEach(t=>{ const d=t.entryTime?.slice(0,10)||''; dailyPnl[d]=+((dailyPnl[d]||0)+t.pnlR).toFixed(2); });
+  let cumEq=0;
+  const equity = Object.keys(dailyPnl).sort().map(d=>{
+    cumEq=+(cumEq+dailyPnl[d]).toFixed(2);
+    return {date:d, daily_r:dailyPnl[d], cumulative_r:cumEq};
+  });
+
+  const buys  = trades.filter(t=>t.dir==='BUY');
+  const sells = trades.filter(t=>t.dir==='SELL');
+
+  return {
+    symbol:sym, range,
+    bars_tested: n,
+    date_from: n ? nf5ISTDate(bars[0].t) : '',
+    date_to:   n ? nf5ISTDate(bars[n-1].t) : '',
+    stats:{
+      total_trades:total, wins:wins.length, losses:losses.length,
+      win_rate:wr, total_r:totR, avg_win_r:avgW, avg_loss_r:avgL,
+      expectancy_r:expR, max_drawdown_r:+dd.toFixed(2),
+      sl_exits:    trades.filter(t=>t.exitReason==='SL').length,
+      trail_exits: trades.filter(t=>t.exitReason==='TRAIL').length,
+      eod_exits:   trades.filter(t=>t.exitReason==='EOD').length,
+      buy_trades:  buys.length,  sell_trades: sells.length,
+      buy_win_rate:  buys.length  ? +(buys.filter(t=>t.outcome==='WIN').length/buys.length*100).toFixed(1)  : 0,
+      sell_win_rate: sells.length ? +(sells.filter(t=>t.outcome==='WIN').length/sells.length*100).toFixed(1) : 0,
+    },
+    trades: trades.slice(-60),
+    equity_curve: equity,
+  };
+}
+
 // ── Visitor stats polling ─────────────────────────────────────────────────────
 async function pollVisitors() {
   try {

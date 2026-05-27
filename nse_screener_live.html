@@ -7614,23 +7614,43 @@ function nf5RenderBacktest(data) {
   const eqSVG = nf5EquityCurve(eq);
 
   // Trade log (last 30)
-  const tradeLog = tr.slice(-30).reverse().map(t => {
-    const isWin  = t.outcome === 'WIN';
-    const col    = isWin ? 'var(--green)' : 'var(--red)';
-    const dirCol = t.direction === 'BUY' ? 'var(--green)' : 'var(--red)';
-    const exitIcon = t.exit_reason === 'SL' ? '🛑' : t.exit_reason === 'TRAIL' ? '🔄' : '🕐';
+  // Add cumulative pts running total for display
+  let runPts = 0;
+  const tradeLog = tr.slice(-50).map(t => {
+    const isWin    = t.outcome === 'WIN';
+    const col      = isWin ? 'var(--green)' : 'var(--red)';
+    const dirCol   = t.direction === 'BUY' ? 'var(--green)' : 'var(--red)';
+    const exitIcon = t.exit_reason==='SL' ? '🛑 SL' : t.exit_reason==='TRAIL' ? '🔄 Trail' : t.exit_reason==='EOD' ? '🕐 EOD' : '📋';
+    const pts      = t.pnl ?? 0;
+    runPts         = +(runPts + pts).toFixed(2);
+    const cumCol   = runPts >= 0 ? 'var(--green)' : 'var(--red)';
     return `
-      <div style="display:flex;align-items:center;gap:6px;padding:5px 0;
-                  border-bottom:1px solid var(--border);font-size:.63rem;flex-wrap:wrap">
-        <span style="min-width:70px;color:var(--muted2)">${t.entry_time?.slice(5,16)||''}</span>
-        <span style="color:${dirCol};font-weight:700;min-width:30px">${t.direction}</span>
-        <span style="color:var(--muted2)">E:₹${t.entry} SL:₹${t.sl?.toFixed(1)} T1:₹${t.t1}</span>
-        <span style="margin-left:auto">${exitIcon}
-          <strong style="color:${col}">
-            ${t.pnl_r >= 0 ? '+' : ''}${t.pnl_r?.toFixed(2)}R
-          </strong>
-          <span style="color:var(--muted2);margin-left:4px">${t.exit_reason}</span>
-        </span>
+      <div style="border:1px solid ${col}20;border-left:3px solid ${col};border-radius:8px;
+                  padding:8px 10px;margin-bottom:6px;background:${isWin?'rgba(0,212,154,.04)':'rgba(255,69,96,.04)'}">
+        <!-- Row 1: direction + entry time + exit reason + R result -->
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px">
+          <span style="color:${dirCol};font-weight:800;font-size:.72rem">${t.direction||'?'}</span>
+          <span style="font-size:.63rem;color:var(--muted2)">${t.entry_time?.slice(5,16)||'?'} →
+            ${t.exit_time?.slice(5,16)||'?'}</span>
+          <span style="font-size:.63rem;background:${col}18;color:${col};border:1px solid ${col}30;
+                       padding:1px 7px;border-radius:6px;margin-left:auto">${exitIcon}</span>
+          <span style="font-size:.76rem;font-weight:800;color:${col}">
+            ${pts >= 0 ? '+' : ''}${pts.toFixed(2)} pts
+          </span>
+          <span style="font-size:.67rem;font-weight:700;color:${col}">
+            (${(t.pnl_r >= 0 ? '+' : '')}${t.pnl_r?.toFixed(2) ?? '?'}R)
+          </span>
+        </div>
+        <!-- Row 2: entry / SL / exit price -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.65rem">
+          <span>Entry: <strong style="color:#4f8ef7">₹${t.entry}</strong></span>
+          <span>Initial SL: <strong style="color:var(--red)">₹${t.sl?.toFixed(2)??'?'}</strong></span>
+          <span>T1: <strong style="color:var(--green)">₹${t.t1}</strong></span>
+          <span>Exit: <strong style="color:${col}">₹${t.exit_price?.toFixed(2)??'?'}</strong></span>
+          <span style="margin-left:auto;color:${cumCol};font-weight:700;font-size:.64rem">
+            Cumulative: ${runPts >= 0 ? '+' : ''}${runPts} pts
+          </span>
+        </div>
       </div>`;
   }).join('');
 
@@ -7646,25 +7666,32 @@ function nf5RenderBacktest(data) {
       </div>
 
       <!-- Primary stats grid -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:8px">
         <div style="background:var(--card);border-radius:9px;padding:10px;text-align:center">
           <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:4px">Win Rate</div>
           <div style="font-size:1.3rem;font-weight:800;color:${wrCol}">${s.win_rate}%</div>
-          <div style="font-size:.6rem;color:var(--muted2)">${s.wins}W / ${s.losses}L</div>
+          <div style="font-size:.6rem;color:var(--muted2)">${s.wins}W / ${s.losses}L / ${s.total_trades} total</div>
         </div>
         <div style="background:var(--card);border-radius:9px;padding:10px;text-align:center">
-          <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:4px">Total P&L</div>
+          <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:4px">Total Points</div>
           <div style="font-size:1.3rem;font-weight:800;color:${rCol}">
-            ${s.total_r >= 0 ? '+' : ''}${s.total_r}R
+            ${(s.total_pts??0) >= 0 ? '+' : ''}${s.total_pts??0}
           </div>
-          <div style="font-size:.6rem;color:var(--muted2)">${s.total_trades} trades</div>
+          <div style="font-size:.6rem;color:var(--muted2)">${s.total_r >= 0 ? '+' : ''}${s.total_r}R</div>
         </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:10px">
         <div style="background:var(--card);border-radius:9px;padding:10px;text-align:center">
           <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:4px">Expectancy</div>
-          <div style="font-size:1.3rem;font-weight:800;color:${expCol}">
+          <div style="font-size:1.1rem;font-weight:800;color:${expCol}">
             ${s.expectancy_r >= 0 ? '+' : ''}${s.expectancy_r?.toFixed(3)}R
           </div>
           <div style="font-size:.6rem;color:var(--muted2)">per trade</div>
+        </div>
+        <div style="background:var(--card);border-radius:9px;padding:10px;text-align:center">
+          <div style="font-size:.58rem;color:var(--muted2);text-transform:uppercase;margin-bottom:4px">Max Drawdown</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--red)">${s.max_drawdown_r}R</div>
+          <div style="font-size:.6rem;color:var(--muted2)">peak to trough</div>
         </div>
       </div>
 
@@ -7700,7 +7727,7 @@ function nf5RenderBacktest(data) {
     <!-- Trade log -->
     <div style="background:var(--card3);border:1px solid var(--border);border-radius:10px;padding:12px">
       <div style="font-size:.67rem;font-weight:700;color:var(--text);margin-bottom:6px">
-        📋 Last ${Math.min(tr.length,30)} Trades
+        📋 All ${tr.length} Trades (latest first)
         <span style="font-size:.6rem;font-weight:400;color:var(--muted2);margin-left:6px">
           🛑 SL hit · 🔄 Trail exit · 🕐 End of day
         </span>
@@ -7884,120 +7911,139 @@ function nf5ComputeSignal(bars, sym) {
 
 // Full backtest — runs entirely in browser
 function nf5ComputeBacktest(bars, sym, range) {
-  const EOD_MINS  = 15 * 60 + 25;
-  const NO_ENTRY  = EOD_MINS - 30;
-  const LOOKBACK  = 5;
-  const n         = bars.length;
-  const bodies    = bars.map(b => Math.abs(b.c - b.o));
-  const trades    = [];
-  let inTrade     = false, trade = null;
+  const EOD_MINS = 15 * 60 + 25;
+  const NO_ENTRY = EOD_MINS - 30;
+  const LOOKBACK = 5;
+  const n        = bars.length;
+  const bodies   = bars.map(b => Math.abs(b.c - b.o));
+  const trades   = [];
+  let inTrade    = false, trade = null;
+
+  function closeTrade(exitP, exitT, reason) {
+    const pnl    = trade.direction==='BUY' ? exitP - trade.entry : trade.entry - exitP;
+    const pnl_r  = trade.risk > 0 ? +(pnl / trade.risk).toFixed(2) : 0;
+    trades.push({ ...trade,
+      exit_price:  +exitP.toFixed(2),
+      exit_time:   exitT,
+      exit_reason: reason,
+      pnl:         +pnl.toFixed(2),
+      pnl_r,
+      outcome:     pnl > 0 ? 'WIN' : 'LOSS',
+    });
+    inTrade = false; trade = null;
+  }
 
   for (let i = LOOKBACK; i < n; i++) {
     const tMins = nf5ISTMins(bars[i].t);
     const tDate = nf5ISTDate(bars[i].t);
 
-    // Force close at EOD
-    if (inTrade && (tDate !== trade.entryDate || tMins >= EOD_MINS)) {
-      const p = bars[i].c;
-      const pnl = trade.dir==='BUY' ? p-trade.entry : trade.entry-p;
-      trades.push({...trade, exitPrice:+p.toFixed(2), exitTime:nf5ISTStr(bars[i].t),
-        exitReason:'EOD', pnl:+pnl.toFixed(2), pnlR:+(pnl/trade.risk).toFixed(2),
-        outcome: pnl>0?'WIN':'LOSS'});
-      inTrade=false; trade=null;
+    // Force close at EOD or new day
+    if (inTrade && (tDate !== trade.entry_date || tMins >= EOD_MINS)) {
+      closeTrade(bars[i].c, nf5ISTStr(bars[i].t), 'EOD');
     }
     if (tMins >= NO_ENTRY) continue;
 
     if (inTrade) {
       const b = bars[i];
-      const slHit = trade.dir==='BUY' ? b.l<=trade.sl : b.h>=trade.sl;
+      const slHit = trade.direction==='BUY' ? b.l <= trade.sl : b.h >= trade.sl;
       if (slHit && !trade.t1Hit) {
-        const pnl = trade.dir==='BUY' ? trade.sl-trade.entry : trade.entry-trade.sl;
-        trades.push({...trade, exitPrice:trade.sl, exitTime:nf5ISTStr(b.t),
-          exitReason:'SL', pnl:+pnl.toFixed(2), pnlR:+(pnl/trade.risk).toFixed(2), outcome:'LOSS'});
-        inTrade=false; trade=null; continue;
+        closeTrade(trade.sl, nf5ISTStr(b.t), 'SL');
+        continue;
       }
-      const t1Hit = trade.dir==='BUY' ? b.h>=trade.t1 : b.l<=trade.t1;
-      if (t1Hit && !trade.t1Hit) { trade.t1Hit=true; trade.sl=trade.entry; }
+      const t1Hit = trade.direction==='BUY' ? b.h >= trade.t1 : b.l <= trade.t1;
+      if (t1Hit && !trade.t1Hit) { trade.t1Hit = true; trade.sl = trade.entry; }
       if (trade.t1Hit) {
-        if (trade.dir==='BUY')  { if (b.l > trade.sl) trade.sl=+b.l.toFixed(2); }
-        else                    { if (b.h < trade.sl) trade.sl=+b.h.toFixed(2); }
-        const trailHit = trade.dir==='BUY' ? b.l<=trade.sl : b.h>=trade.sl;
-        if (trailHit) {
-          const pnl = trade.dir==='BUY' ? trade.sl-trade.entry : trade.entry-trade.sl;
-          trades.push({...trade, exitPrice:trade.sl, exitTime:nf5ISTStr(b.t),
-            exitReason:'TRAIL', pnl:+pnl.toFixed(2), pnlR:+(pnl/trade.risk).toFixed(2), outcome:'WIN'});
-          inTrade=false; trade=null;
-        }
+        if (trade.direction==='BUY')  { if (b.l > trade.sl) trade.sl = +b.l.toFixed(2); }
+        else                          { if (b.h < trade.sl) trade.sl = +b.h.toFixed(2); }
+        const trailHit = trade.direction==='BUY' ? b.l <= trade.sl : b.h >= trade.sl;
+        if (trailHit) closeTrade(trade.sl, nf5ISTStr(b.t), 'TRAIL');
       }
       continue;
     }
 
-    // Signal
+    // Signal detection
     const bodyI   = bodies[i];
-    const prevMax = Math.max(...bodies.slice(i-LOOKBACK, i));
+    const prevMax = Math.max(...bodies.slice(i - LOOKBACK, i));
     if (bodyI <= prevMax) continue;
-    const dir   = bars[i].c > bars[i].o ? 'BUY' : 'SELL';
-    const entry = bars[i].c;
-    const sl    = dir==='BUY' ? bars[i].l : bars[i].h;
-    const risk  = Math.abs(entry-sl);
+    const direction = bars[i].c > bars[i].o ? 'BUY' : 'SELL';
+    const entry     = bars[i].c;
+    const sl        = direction==='BUY' ? bars[i].l : bars[i].h;
+    const risk      = Math.abs(entry - sl);
     if (risk < 0.5) continue;
-    inTrade=true;
-    trade={
-      entryBar:i, entryTime:nf5ISTStr(bars[i].t), entryDate:tDate,
-      dir, entry:+entry.toFixed(2), sl:+sl.toFixed(2),
-      t1:+(entry+(dir==='BUY'?2:-2)*risk).toFixed(2),
-      risk:+risk.toFixed(2), expansion:prevMax>0?+(bodyI/prevMax).toFixed(2):0,
-      body:+bodyI.toFixed(2), prevMax:+prevMax.toFixed(2), t1Hit:false,
+
+    inTrade = true;
+    trade = {
+      entry_bar:  i,
+      entry_time: nf5ISTStr(bars[i].t),
+      entry_date: tDate,
+      direction,
+      entry:      +entry.toFixed(2),
+      sl:         +sl.toFixed(2),
+      t1:         +(entry + (direction==='BUY' ? 2 : -2) * risk).toFixed(2),
+      risk:       +risk.toFixed(2),
+      expansion:  prevMax > 0 ? +(bodyI / prevMax).toFixed(2) : 0,
+      body:       +bodyI.toFixed(2),
+      t1Hit:      false,
     };
   }
+
+  // Close any still-open trade at end of data
   if (inTrade && trade) {
-    const p = bars[n-1].c;
-    const pnl = trade.dir==='BUY' ? p-trade.entry : trade.entry-p;
-    trades.push({...trade, exitPrice:+p.toFixed(2), exitTime:nf5ISTStr(bars[n-1].t),
-      exitReason:'DATA_END', pnl:+pnl.toFixed(2), pnlR:+(pnl/trade.risk).toFixed(2),
-      outcome:pnl>0?'WIN':'LOSS'});
+    closeTrade(bars[n-1].c, nf5ISTStr(bars[n-1].t), 'DATA_END');
   }
 
-  // Stats
-  const wins   = trades.filter(t=>t.outcome==='WIN');
-  const losses = trades.filter(t=>t.outcome==='LOSS');
-  const total  = trades.length;
-  const wr     = total ? +(wins.length/total*100).toFixed(1) : 0;
-  const avgW   = wins.length   ? +(wins.reduce((a,t)=>a+t.pnlR,0)/wins.length).toFixed(2)     : 0;
-  const avgL   = losses.length ? +(losses.reduce((a,t)=>a+t.pnlR,0)/losses.length).toFixed(2) : 0;
-  const totR   = +(trades.reduce((a,t)=>a+t.pnlR,0)).toFixed(2);
-  const expR   = +(wr/100*avgW + (1-wr/100)*avgL).toFixed(3);
-  let peak=0, dd=0, cum=0;
-  trades.forEach(t=>{cum+=t.pnlR; peak=Math.max(peak,cum); dd=Math.max(dd,peak-cum);});
-
-  const dailyPnl={};
-  trades.forEach(t=>{ const d=t.entryTime?.slice(0,10)||''; dailyPnl[d]=+((dailyPnl[d]||0)+t.pnlR).toFixed(2); });
-  let cumEq=0;
-  const equity = Object.keys(dailyPnl).sort().map(d=>{
-    cumEq=+(cumEq+dailyPnl[d]).toFixed(2);
-    return {date:d, daily_r:dailyPnl[d], cumulative_r:cumEq};
+  // Add cumulative points to each trade for display
+  let cumPts = 0;
+  trades.forEach(t => {
+    cumPts = +(cumPts + t.pnl).toFixed(2);
+    t.cum_pts = cumPts;
   });
 
-  const buys  = trades.filter(t=>t.dir==='BUY');
-  const sells = trades.filter(t=>t.dir==='SELL');
+  // Stats
+  const wins   = trades.filter(t => t.outcome === 'WIN');
+  const losses = trades.filter(t => t.outcome === 'LOSS');
+  const total  = trades.length;
+  const wr     = total ? +(wins.length / total * 100).toFixed(1) : 0;
+  const avgW   = wins.length   ? +(wins.reduce((a,t) => a+t.pnl_r, 0)   / wins.length).toFixed(2)   : 0;
+  const avgL   = losses.length ? +(losses.reduce((a,t) => a+t.pnl_r, 0) / losses.length).toFixed(2) : 0;
+  const totR   = +(trades.reduce((a,t) => a + t.pnl_r, 0)).toFixed(2);
+  const totPts = +(trades.reduce((a,t) => a + t.pnl, 0)).toFixed(2);
+  const expR   = +(wr/100 * avgW + (1 - wr/100) * avgL).toFixed(3);
+  let peak = 0, dd = 0, cumR = 0;
+  trades.forEach(t => { cumR += t.pnl_r; peak = Math.max(peak, cumR); dd = Math.max(dd, peak - cumR); });
+
+  const dailyPnl = {};
+  trades.forEach(t => {
+    const d = t.entry_time?.slice(0,10) || '';
+    dailyPnl[d] = +((dailyPnl[d]||0) + t.pnl_r).toFixed(2);
+  });
+  let cumEq = 0;
+  const equity = Object.keys(dailyPnl).sort().map(d => {
+    cumEq = +(cumEq + dailyPnl[d]).toFixed(2);
+    return { date: d, daily_r: dailyPnl[d], cumulative_r: cumEq };
+  });
+
+  const buys  = trades.filter(t => t.direction==='BUY');
+  const sells = trades.filter(t => t.direction==='SELL');
 
   return {
-    symbol:sym, range,
-    bars_tested: n,
-    date_from: n ? nf5ISTDate(bars[0].t) : '',
-    date_to:   n ? nf5ISTDate(bars[n-1].t) : '',
-    stats:{
-      total_trades:total, wins:wins.length, losses:losses.length,
-      win_rate:wr, total_r:totR, avg_win_r:avgW, avg_loss_r:avgL,
-      expectancy_r:expR, max_drawdown_r:+dd.toFixed(2),
-      sl_exits:    trades.filter(t=>t.exitReason==='SL').length,
-      trail_exits: trades.filter(t=>t.exitReason==='TRAIL').length,
-      eod_exits:   trades.filter(t=>t.exitReason==='EOD').length,
-      buy_trades:  buys.length,  sell_trades: sells.length,
-      buy_win_rate:  buys.length  ? +(buys.filter(t=>t.outcome==='WIN').length/buys.length*100).toFixed(1)  : 0,
+    symbol: sym, range,
+    bars_tested:  n,
+    date_from:    n ? nf5ISTDate(bars[0].t)   : '',
+    date_to:      n ? nf5ISTDate(bars[n-1].t) : '',
+    stats: {
+      total_trades: total, wins: wins.length, losses: losses.length,
+      win_rate: wr, total_r: totR, total_pts: totPts,
+      avg_win_r: avgW, avg_loss_r: avgL,
+      expectancy_r: expR, max_drawdown_r: +dd.toFixed(2),
+      sl_exits:    trades.filter(t => t.exit_reason==='SL').length,
+      trail_exits: trades.filter(t => t.exit_reason==='TRAIL').length,
+      eod_exits:   trades.filter(t => t.exit_reason==='EOD').length,
+      buy_trades:   buys.length,  sell_trades: sells.length,
+      buy_win_rate:  buys.length  ? +(buys.filter(t=>t.outcome==='WIN').length/buys.length*100).toFixed(1)   : 0,
       sell_win_rate: sells.length ? +(sells.filter(t=>t.outcome==='WIN').length/sells.length*100).toFixed(1) : 0,
     },
-    trades: trades.slice(-60),
+    trades:       trades.slice(-60),
     equity_curve: equity,
   };
 }

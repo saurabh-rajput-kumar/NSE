@@ -4591,13 +4591,43 @@ function rNifty() {
 
     <!-- ── Backtest Section ── -->
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="flex:1">
-          <div style="font-size:.78rem;font-weight:800;color:var(--text)">📊 Strategy Backtest</div>
-          <div style="font-size:.64rem;color:var(--muted2);margin-top:2px">
-            Same signal · exact SL/trail rules · 1:2 min · 30 or 60 days of 5-min data
-          </div>
+      <div style="font-size:.78rem;font-weight:800;color:var(--text);margin-bottom:10px">📊 Strategy Backtest</div>
+
+      <!-- SL Mode toggle -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">
+          Stop Loss Mode
         </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onclick="nf5SetSLMode('candle')" id="nf5-sl-candle"
+            style="padding:5px 12px;border-radius:8px;font-size:.7rem;font-weight:700;cursor:pointer;
+                   background:rgba(79,142,247,.2);color:#4f8ef7;border:1px solid rgba(79,142,247,.4)">
+            📊 Candle Low/High
+          </button>
+          <button onclick="nf5SetSLMode('fixed')" id="nf5-sl-fixed"
+            style="padding:5px 12px;border-radius:8px;font-size:.7rem;font-weight:700;cursor:pointer;
+                   background:var(--card2);color:var(--muted2);border:1px solid var(--border2)">
+            🎯 Fixed Points
+          </button>
+        </div>
+        <!-- Fixed SL input (shown only when fixed mode selected) -->
+        <div id="nf5-sl-fixed-row" style="display:none;margin-top:8px;align-items:center;gap:8px;flex-wrap:wrap">
+          <label style="font-size:.68rem;color:var(--muted2)">SL Points:</label>
+          <input id="nf5-sl-pts" type="number" value="20" min="5" max="200" step="5"
+            class="c" style="width:80px;font-size:.78rem;padding:5px 8px;text-align:center"/>
+          <div style="display:flex;gap:5px">
+            ${[10,15,20,30,40,50].map(v =>
+              `<button onclick="document.getElementById('nf5-sl-pts').value=${v}"
+                style="padding:3px 9px;border-radius:6px;font-size:.67rem;font-weight:700;cursor:pointer;
+                       background:var(--card3);color:var(--muted2);border:1px solid var(--border)">${v}</button>`
+            ).join('')}
+          </div>
+          <span style="font-size:.63rem;color:var(--muted2)">After 1:2 → trail to candle low/high</span>
+        </div>
+      </div>
+
+      <!-- Range + Run -->
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select id="nf5-bt-range" class="c" style="font-size:.72rem;padding:5px 8px">
           <option value="30d" selected>30 days</option>
           <option value="60d">60 days</option>
@@ -4607,11 +4637,14 @@ function rNifty() {
                  padding:6px 16px;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer">
           📊 Run Backtest
         </button>
+        <span id="nf5-sl-mode-label" style="font-size:.63rem;color:var(--muted2)">SL: candle low/high</span>
       </div>
-      <div id="nf5-bt-result">
+
+      <div id="nf5-bt-result" style="margin-top:10px">
         <div style="font-size:.68rem;color:var(--muted2)">
-          Select 30d or 60d above and click <strong>Run Backtest</strong>.
-          Simulates every body-expansion signal with exact trailing stop rules.
+          Choose SL mode above, then click <strong>Run Backtest</strong>.<br>
+          <strong>Candle:</strong> SL = exact candle low (BUY) or high (SELL) ·
+          <strong>Fixed:</strong> SL = entry ± N points · After T1 (1:2): trail SL to each candle low/high
         </div>
       </div>
     </div>
@@ -7543,6 +7576,28 @@ function nf5MiniChart(ctx, sig) {
 // ── 5-MIN BACKTEST UI ─────────────────────────────────────────────────────────
 let NF5_BT_STATE = { loading: false, data: null };
 
+let NF5_SL_MODE = 'candle'; // 'candle' | 'fixed'
+
+function nf5SetSLMode(mode) {
+  NF5_SL_MODE = mode;
+  const candleBtn = document.getElementById('nf5-sl-candle');
+  const fixedBtn  = document.getElementById('nf5-sl-fixed');
+  const fixedRow  = document.getElementById('nf5-sl-fixed-row');
+  const modeLabel = document.getElementById('nf5-sl-mode-label');
+  if (mode === 'candle') {
+    if (candleBtn) { candleBtn.style.background='rgba(79,142,247,.2)'; candleBtn.style.color='#4f8ef7'; candleBtn.style.borderColor='rgba(79,142,247,.4)'; }
+    if (fixedBtn)  { fixedBtn.style.background='var(--card2)'; fixedBtn.style.color='var(--muted2)'; fixedBtn.style.borderColor='var(--border2)'; }
+    if (fixedRow)  fixedRow.style.display = 'none';
+    if (modeLabel) modeLabel.textContent = 'SL: candle low/high';
+  } else {
+    if (fixedBtn)  { fixedBtn.style.background='rgba(245,197,24,.15)'; fixedBtn.style.color='var(--yellow)'; fixedBtn.style.borderColor='rgba(245,197,24,.4)'; }
+    if (candleBtn) { candleBtn.style.background='var(--card2)'; candleBtn.style.color='var(--muted2)'; candleBtn.style.borderColor='var(--border2)'; }
+    if (fixedRow)  fixedRow.style.display = 'flex';
+    const pts = document.getElementById('nf5-sl-pts')?.value || '20';
+    if (modeLabel) modeLabel.textContent = `SL: fixed ${pts} pts`;
+  }
+}
+
 async function nf5RunBacktest() {
   const sym   = document.getElementById('nf5-sym')?.value || '^NSEI';
   const range = document.getElementById('nf5-bt-range')?.value || '30d';
@@ -7585,7 +7640,9 @@ async function nf5RunBacktest() {
       return;
     }
 
-    const result = nf5ComputeBacktest(bars, sym, range);
+    const slMode = NF5_SL_MODE;
+    const slPts  = parseFloat(document.getElementById('nf5-sl-pts')?.value || '20') || 20;
+    const result = nf5ComputeBacktest(bars, sym, range, slMode, slPts);
     NF5_BT_STATE.data = result;
     resEl.innerHTML = nf5RenderBacktest(result);
   } catch(e) {
@@ -7644,7 +7701,7 @@ function nf5RenderBacktest(data) {
         <!-- Row 2: entry / SL / exit price -->
         <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.65rem">
           <span>Entry: <strong style="color:#4f8ef7">₹${t.entry}</strong></span>
-          <span>Initial SL: <strong style="color:var(--red)">₹${t.sl?.toFixed(2)??'?'}</strong></span>
+          <span>SL (${t.sl_mode||'candle'}): <strong style="color:var(--red)">₹${t.initial_sl?.toFixed(2)??t.sl?.toFixed(2)??'?'}</strong></span>
           <span>T1: <strong style="color:var(--green)">₹${t.t1}</strong></span>
           <span>Exit: <strong style="color:${col}">₹${t.exit_price?.toFixed(2)??'?'}</strong></span>
           <span style="margin-left:auto;color:${cumCol};font-weight:700;font-size:.64rem">
@@ -7660,6 +7717,9 @@ function nf5RenderBacktest(data) {
                 padding:12px;margin-bottom:12px">
       <div style="font-size:.72rem;font-weight:800;color:var(--text);margin-bottom:10px">
         📊 Backtest Results · ${data.symbol} · ${data.date_from} → ${data.date_to}
+        <span style="font-size:.62rem;font-weight:600;color:var(--yellow);margin-left:6px">
+          SL: ${data.sl_mode||'candle low/high'}
+        </span>
         <span style="font-size:.62rem;font-weight:400;color:var(--muted2);margin-left:6px">
           ${data.bars_tested?.toLocaleString()} bars tested
         </span>
@@ -7910,7 +7970,7 @@ function nf5ComputeSignal(bars, sym) {
 }
 
 // Full backtest — runs entirely in browser
-function nf5ComputeBacktest(bars, sym, range) {
+function nf5ComputeBacktest(bars, sym, range, slMode, slPts) {
   const EOD_MINS = 15 * 60 + 25;
   const NO_ENTRY = EOD_MINS - 30;
   const LOOKBACK = 5;
@@ -7967,23 +8027,36 @@ function nf5ComputeBacktest(bars, sym, range) {
     if (bodyI <= prevMax) continue;
     const direction = bars[i].c > bars[i].o ? 'BUY' : 'SELL';
     const entry     = bars[i].c;
-    const sl        = direction==='BUY' ? bars[i].l : bars[i].h;
-    const risk      = Math.abs(entry - sl);
+
+    // SL depends on mode:
+    // candle → exact candle low (BUY) or candle high (SELL)
+    // fixed  → entry ± slPts points (fixed distance)
+    const fixedSlPts = slPts || 20;
+    const sl = (slMode === 'fixed')
+      ? (direction==='BUY' ? +(entry - fixedSlPts).toFixed(2) : +(entry + fixedSlPts).toFixed(2))
+      : (direction==='BUY' ? bars[i].l : bars[i].h);
+
+    const risk = Math.abs(entry - sl);
     if (risk < 0.5) continue;
+
+    // T1 = 1:2 R:R from entry using the chosen SL distance
+    const t1 = +(entry + (direction==='BUY' ? 2 : -2) * risk).toFixed(2);
 
     inTrade = true;
     trade = {
-      entry_bar:  i,
-      entry_time: nf5ISTStr(bars[i].t),
-      entry_date: tDate,
+      entry_bar:   i,
+      entry_time:  nf5ISTStr(bars[i].t),
+      entry_date:  tDate,
       direction,
-      entry:      +entry.toFixed(2),
-      sl:         +sl.toFixed(2),
-      t1:         +(entry + (direction==='BUY' ? 2 : -2) * risk).toFixed(2),
-      risk:       +risk.toFixed(2),
-      expansion:  prevMax > 0 ? +(bodyI / prevMax).toFixed(2) : 0,
-      body:       +bodyI.toFixed(2),
-      t1Hit:      false,
+      entry:       +entry.toFixed(2),
+      sl:          +sl.toFixed(2),
+      initial_sl:  +sl.toFixed(2),    // stored separately so we know original SL
+      t1,
+      risk:        +risk.toFixed(2),
+      expansion:   prevMax > 0 ? +(bodyI / prevMax).toFixed(2) : 0,
+      body:        +bodyI.toFixed(2),
+      sl_mode:     slMode === 'fixed' ? `fixed ${fixedSlPts}pts` : 'candle',
+      t1Hit:       false,
     };
   }
 
@@ -8028,6 +8101,7 @@ function nf5ComputeBacktest(bars, sym, range) {
 
   return {
     symbol: sym, range,
+    sl_mode: slMode==='fixed' ? `fixed ${slPts} pts` : 'candle low/high',
     bars_tested:  n,
     date_from:    n ? nf5ISTDate(bars[0].t)   : '',
     date_to:      n ? nf5ISTDate(bars[n-1].t) : '',

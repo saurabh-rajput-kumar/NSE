@@ -583,6 +583,7 @@ input,select,textarea{font-size:16px!important;}
   <div class="ntab" id="t-iv" onclick="gt('iv')">💎 Invest</div>
   <div class="ntab" id="t-nf" onclick="gt('nf')">🇮🇳 Nifty</div>
   <div class="ntab" id="t-cr" onclick="gt('cr')">₿ Crypto</div>
+  <div class="ntab" id="t-op" onclick="gt('op')">⚡ Options</div>
   <div class="ntab" id="t-fo" onclick="gt('fo')">📊 F&amp;O OI</div>
   <div class="ntab" id="t-fi" onclick="gt('fi')">🌍 FII/DII</div>
   <div class="ntab" id="t-ro" onclick="gt('ro')">🔁 Rotation</div>
@@ -989,7 +990,7 @@ const SM={"RELIANCE":"Energy","ONGC":"Energy","COALINDIA":"Energy","TATAPOWER":"
   "CESC":"Infrastructure",
   "IGL":"Energy",
   "MGL":"Energy",
-  "GUJGASLTD":"Energy",
+  "GUJENERGY":"Energy","YASHO":"Chemicals","VIDHIING":"Chemicals","CLEANSCITEC":"Chemicals","IONEXCHANG":"Chemicals","APOLLOMICRO":"Defence","DATAPATTNS":"Defence","BIKAJI":"Consumer","DOMS":"Consumer","AWFIS":"Consumer","NESCO":"Consumer","BLUEJET":"Pharma","INDGN":"Pharma","RRKABEL":"Capgoods","OLECTRA":"Auto","EXICOM":"Auto","WELENT":"Infrastructure","GODIGIT":"Finance","EMIL":"Consumer","GPIL":"Metals","SWIGGY":"Consumer","WAAREE":"Energy","PREMIERENE":"Energy","JSWINFRA":"Infrastructure","BAJAJHFL":"Finance","HEXT":"IT","ITCHOTELS":"Consumer","INDUSTOWER":"Telecom","JSL":"Metals","HYUNDAI":"Auto",
   "ATGL":"Energy",
   "JSWENERGY":"Infrastructure",
   "RATNAMANI":"Metals",
@@ -1050,8 +1051,8 @@ const SM={"RELIANCE":"Energy","ONGC":"Energy","COALINDIA":"Energy","TATAPOWER":"
 ,
   "BANKINDIA":"Banking"};
 const SC={"Energy":"#ff9f43","IT":"#54a0ff","Banking":"#5f27cd","NBFC":"#a29bfe","Insurance":"#fd79a8","FMCG":"#00b894","Pharma":"#00cec9","Auto":"#e17055","Paints":"#fdcb6e","Infra":"#636e72","Metals":"#b2bec3","Cement":"#dfe6e9","Jewellery":"#f9ca24","Healthcare":"#6ab04c","Cons.Elec":"#e55039","New Age":"#8e44ad","Aviation":"#2980b9","Fin Svc":"#27ae60","Chemicals":"#d35400","Realty":"#c0392b","Apparel":"#7f8c8d","Agri":"#16a085","Retail":"#e84393","Beverages":"#6c5ce7"};
-const SYMS_P1=["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR", "SBIN", "BHARTIARTL", "ITC", "KOTAKBANK", "LT", "AXISBANK", "ASIANPAINT", "MARUTI", "NESTLEIND", "ULTRACEMCO", "TITAN", "BAJFINANCE", "WIPRO", "HCLTECH", "SUNPHARMA", "ONGC", "POWERGRID", "NTPC", "TECHM", "DRREDDY", "CIPLA", "DIVISLAB", "EICHERMOT", "HEROMOTOCO", "BAJAJFINSV", "BRITANNIA", "ADANIENT", "ADANIPORTS", "COALINDIA", "GRASIM", "JSWSTEEL", "TATASTEEL", "HINDALCO", "INDUSINDBK", "BAJAJ-AUTO", "M%26M", "TATACONSUM", "APOLLOHOSP", "HAVELLS", "DABUR", "MARICO", "COLPAL", "PIDILITIND", "BERGEPAINT", "VOLTAS", "GODREJCP", "DLF", "ETERNAL", "IRCTC", "INDIGO", "TRENT", "MUTHOOTFIN", "CHOLAFIN", "SBILIFE", "HDFCLIFE", "ICICIGI", "LICI", "FEDERALBNK", "IDFCFIRSTB", "BANDHANBNK", "RBLBANK", "PNB", "BANKBARODA", "CANBK", "UNIONBANK", "SAIL", "NMDC", "TATAPOWER", "ADANIGREEN", "TORNTPOWER", "RECLTD", "PFC", "IRFC", "RVNL", "IRCON", "RAILTEL", "AUROPHARMA", "LUPIN", "GLENMARK", "ALKEM", "TORNTPHARM", "MPHASIS", "LTIM", "PERSISTENT", "COFORGE", "KPITTECH", "TATAELXSI", "DIXON", "NAUKRI", "INDIAMART", "AFFLE", "CAMS", "CDSL", "BSE", "MCX", "AARTIIND", "DEEPAKNITR", "SRF", "BALRAMCHIN", "EMAMILTD", "PAYTM", "NYKAA", "DELHIVERY", "ABFRL", "PAGEIND", "RADICO", "GODREJPROP", "PRESTIGE", "OBEROIRLTY", "BRIGADE", "ADANIPOWER", "ADANIENSOL", "NTPCGREEN", "KPRMILL", "SUPREMEIND", "APLAPOLLO", "CESC", "NHPC", "SJVN", "JSWENERGY", "IPCALAB", "NATCOPHARM", "ABBOTINDIA", "MOTHERSON", "BHARATFORG", "BALKRISIND", "TIINDIA", "ABB", "SIEMENS", "BHEL", "THERMAX", "GRINDWELL", "MFSL", "IIFL", "ANGELONE", "MOTILALOFS", "VBL", "UBL", "CYIENT", "MASTEK", "PIIND", "VINATIORGA", "NAVINFLUOR", "POLICYBZR", "CARTRADE", "CAMPUS", "LTTS", "HAPPSTMNDS", "INTELLECT", "BIOCON", "SYNGENE", "JBCHEPHARM", "LAURUSLABS", "GRANULES", "ASTERDM", "METROPOLIS", "TMPV", "TMCV", "TVSMOTOR", "ASHOKLEYL", "ENDURANCE", "EXIDEIND", "AMARA", "CIEINDIA", "CANFINHOME", "AAVAS", "HOMEFIRST", "360ONE", "HDFCAMC", "ABCAPITAL", "MANAPPURAM", "SBICARDS", "JIOFIN", "PHOENIXLTD", "LODHA", "IGL", "MGL", "GUJGASLTD", "DEEPAKNTR", "ALKYLAMINE", "FLUOROCHEM", "ASTRAL", "DMART", "PAGE", "KALYANKJIL", "SENCO", "JUBLFOOD", "HAL", "BEL", "CUMMINSIND", "BEML", "RATNAMANI", "VEDL", "HINDCOPPER", "JINDALSAW", "HUDCO", "IREDA", "CONCOR", "JYOTHYLAB", "POLYCAB", "KAYNES", "SYRMA", "TATACOMM", "ZEEL", "PVRINOX"];
-const SYMS_P2=["NUVOCO", "KARURVYSYA", "CSBBANK", "EQUITASBNK", "UJJIVANSFB", "SURYODAY", "DCBBANK", "STARHEALTH", "NIACL", "GICRE", "ICICIPRU", "UTIAMC", "WEALTH", "ISEC", "IIFLCAPS", "EDELWEISS", "SBFC", "UGROCAP", "CREDITACC", "ARMANFIN", "SPANDANA", "FUSION", "PNBHOUSING", "APTUS", "INDIABULL", "HDFCSEC", "CHOLAHLDNG", "TATACHEM", "NOCIL", "PCBL", "DCMSHRIRAM", "ATUL", "BASF", "SUMICHEM", "GNFC", "CLEAN", "VINYSCORP", "HIKAL", "ROSSARI", "FINEORG", "SUPRIYA", "AETHER", "SUDARSCHEM", "TVSHLTD", "SUPRAJIT", "SUNDRMFAST", "NRBBEARING", "ASAHIINDIA", "SCHAEFFLER", "TIMKEN", "SKFINDIA", "ZENTEC", "IDEAFORGE", "MTAR", "ELIN", "MAZDOCK", "COCHINSHIP", "GRSE", "RPSGVENT", "SHREECEM", "HEIDELBERG", "WELSPUNLIV", "WELCORP", "NATIONALUM", "MOIL", "TATAMETALIK", "SHYAMMETL", "SOBHA", "KEYSTONE", "MAHLIFE", "SAREGAMA", "TIPS", "BALAJITELE", "NAZARA", "DELTACORP", "TVTODAY", "DBCORP", "GIPCL", "ATGL", "RPOWER", "ADANIGASP", "VARUN", "VSTIND", "PATANJALI", "RAYMOND", "VMART", "METROBRAND", "DEVYANI", "UNITDSPR", "HONAUT", "GILLETTE", "PGHH", "HAPPY", "BSOFT", "ZENSAR", "NIITLTD", "RATEGAIN", "TANLA", "JUSTDIAL", "REDINGTON", "EASEMYTRIP", "IXIGO", "GSHIP", "SCI", "GPPL", "CONCORD", "MAHLOG", "EPIGRAL", "GARFIBRES", "GOKUL", "SEQUENT", "MSTCLTD", "VSTTILLERS", "KIRLOSENGB", "WABAG", "NILAINFRA", "GLAND", "NEULANDLAB", "SPARC", "ERIS", "MEDANTA", "KRSNAA", "INOX", "GREENPANEL", "CENTURYPLY", "GREENPLY", "VARDHMAN", "TRIDENT", "ARVIND", "WELSPUN", "HLEGLAS", "BOMDYEING", "NETWORK18", "JAGRAN", "NSLNISP", "TATAINVEST", "BAJAJCON", "LANDMARK", "SAPPHIREFDS", "GLAXO", "PFIZER", "ASTRAZEN", "SANOFI", "3MINDIA", "CEATLTD", "MAPMYINDIA", "RITES", "THDC", "GMRAIRPORT", "ADANIAIRPORT", "TTML", "HFCL", "STLTECH", "VINDHYATEL", "TEJAS", "SOUTHBANK", "IOB", "UCOBANK", "CENTRALBNK", "MAHABANK", "JKBANK", "KARNATAKA", "TMBBANK", "CITYUNIONBK", "LAKSHVILAS", "AUBANK", "FINOPB", "NAINITAL", "ICICIB25", "LICNETFN5", "GOLDBEES", "LICHSGFIN", "REPCO", "SBICARD", "PAISALO", "AROHAN", "ASIANLEASIN", "OFSS", "HEXAWARE", "BIRLASOFT", "ECLERX", "DATAMATICS", "TATATECH", "SONATASOFTW", "ROUTE", "NEWGEN", "NUCLEUS", "SAKSOFT", "QUICKHEAL", "WINDLAS", "SOLARA", "BLISSGVS", "NUVAXOVID", "OPTIEMUS", "FCONSUMER", "ALEMBICLTD", "FDC", "NATCOPHARMA", "AMRUTANJAN", "AJANTPHARM", "SUVEN", "CAPLIPOINT", "SHILPAMED", "STRIDES", "MARKSANS", "LAURUS", "DRREDDYLAB", "NEOGEN", "CAMLIN", "INSECTICID", "DHANUKA", "RALLIS", "BAYER", "GHCL", "AKZONOBLE", "GUJALKALI", "IOLCP", "LXCHEM", "ARCHCHEM", "TRONOX", "CHEMPLAST", "ANUPAM", "NFIL", "SWANENERGY", "WABCOINDIA", "ZFCVINDIA", "BOSCHLTD", "SUNDARAM", "UNOMINDA", "MINDA", "GABRIEL", "JAMNA", "CRAFTSMAN", "SUBROS", "LUMAX", "SPIINDUS", "FABRINET", "ACCELYA", "MISHRA", "AEROFLEXIND", "SOLARINDS", "PARAS", "TEXMOPIPES", "TRIVENI", "KENNAMETAL", "ELGIEQUIP", "ISGEC", "PRAJ", "SPCENET", "BLS", "BHARAT", "APARINDS", "ELECON", "GRAPHITE", "HEG", "POWERINDIA", "CG", "VOLTAMP", "TDPOWERSYS", "INOXWIND", "SUZLON", "RNEWIND", "WINDWORLD", "GREENENERGY", "ORIENT", "BATA", "RELAXO", "VIPIND", "SAFARI", "SAMSONITE", "VIP", "WEDGWOOD", "THANGAMAYL", "GOLDIAM", "PCJEWELLER", "SHOPERSTOP", "INDIGOPNTS", "BAJAJELEC", "WHIRLPOOL", "SYMPHONY", "AMBER", "BLUESTAR", "HITACHI", "ONMOBILE", "PB", "XPRESSBEES", "VENKEYS", "TASTYBITESS", "HERITAGE", "DODLA", "HATSUN", "HPCL", "BPCL", "IOC", "MRPL", "CPCL", "ENNORE", "RAMASTEEL", "GALLANTT", "MSTEEL", "NILE", "JAYASWAL", "ISPAT", "MANAKSIA", "SHAREINDIA", "NCC", "HG", "KNR", "AHLUCONT", "DILIPBUILDCON", "PNCINFRA", "GESHIP", "GVK", "IRB", "MEP", "SADBHAV", "NBCC", "HINDPETRO", "PETRONET", "GAIL", "GSPL", "AEGASLTD", "ORIENTGREN", "BORORENEW", "KOLTEPATIL", "PURAVANKARA", "ARIHANTSUPR", "SUNTECK", "ELDECO", "KRISHNAVAL", "ASHIANA", "WPIL", "ANANTRAJ", "AMBUJACEM", "ACC", "BIRLACORPN", "SANGHI", "INDIACEM", "WCLGROUP", "KCP", "PRISMJOHNSN", "NCL", "SUNTV", "HATHWAY", "GTLINFRA", "DEN", "RUPA", "DOLLAR", "NAHAR", "NITIN", "SUTLEJTEX", "HIMATSEIDE", "SIYARAM", "BOMBDYEING", "INDHOTEL", "EIHOTEL", "MAHINDRA", "CHALET", "LEMONTRE", "YATRA", "MAKEMYTRIP", "BLUEDART", "GATEWAY", "ALLCARGO", "TCI", "TCNSCLOTH", "VRLLOGISTIC", "MAHINDLOG", "NAVKAR", "SNOWMAN", "UPL", "COROMANDEL", "CHAMBALFERT", "RCF", "FACT", "KSCL", "IFFCO", "ZUARI", "NFL", "RLFL", "JINDALSTEL", "JSPL", "JSWHL", "ESAFSFB", "INDIANB", "IDBI", "LALPATHLAB", "THYROCARE", "MAXHEALTH", "FORTIS", "FIVESTAR", "SHRIRAMFIN", "KFINTECH", "BSEIND", "RAILVIKAS", "SHARDACROP", "PRINCEPIPE", "KEI", "VGUARD", "FINOLEX", "CROMPTON", "GODREJIND", "BAJAJHLDNG", "KANSAINER", "AKZONOBEL", "JUBLPHARMA", "NATCO", "NESTLE", "COLGATE", "EMAMI", "KNRCON", "HCC", "KITEX", "LUXIND", "AIAENG", "CARBORUNIV", "SHALBY", "YATHARTH", "KIMS", "RAINBOW", "VIJAYABANK", "UJJIVAN", "EQUITAS", "CHOLAMAND", "BOI", "CENTRALBK", "ICICIPRULI", "BANKINDIA", "JKCEMENT", "RAMCOCEM", "POLYPLEX", "HAPPST"];
+const SYMS_P1=["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR", "SBIN", "BHARTIARTL", "ITC", "KOTAKBANK", "LT", "AXISBANK", "ASIANPAINT", "MARUTI", "NESTLEIND", "ULTRACEMCO", "TITAN", "BAJFINANCE", "WIPRO", "HCLTECH", "SUNPHARMA", "ONGC", "POWERGRID", "NTPC", "TECHM", "DRREDDY", "CIPLA", "DIVISLAB", "EICHERMOT", "HEROMOTOCO", "BAJAJFINSV", "BRITANNIA", "ADANIENT", "ADANIPORTS", "COALINDIA", "GRASIM", "JSWSTEEL", "TATASTEEL", "HINDALCO", "INDUSINDBK", "BAJAJ-AUTO", "M%26M", "TATACONSUM", "APOLLOHOSP", "HAVELLS", "DABUR", "MARICO", "COLPAL", "PIDILITIND", "BERGEPAINT", "VOLTAS", "GODREJCP", "DLF", "ETERNAL", "IRCTC", "INDIGO", "TRENT", "MUTHOOTFIN", "CHOLAFIN", "SBILIFE", "HDFCLIFE", "ICICIGI", "LICI", "FEDERALBNK", "IDFCFIRSTB", "BANDHANBNK", "RBLBANK", "PNB", "BANKBARODA", "CANBK", "UNIONBANK", "SAIL", "NMDC", "TATAPOWER", "ADANIGREEN", "TORNTPOWER", "RECLTD", "PFC", "IRFC", "RVNL", "IRCON", "RAILTEL", "AUROPHARMA", "LUPIN", "GLENMARK", "ALKEM", "TORNTPHARM", "MPHASIS", "LTIM", "PERSISTENT", "COFORGE", "KPITTECH", "TATAELXSI", "DIXON", "NAUKRI", "INDIAMART", "AFFLE", "CAMS", "CDSL", "BSE", "MCX", "AARTIIND", "DEEPAKNITR", "SRF", "BALRAMCHIN", "EMAMILTD", "PAYTM", "NYKAA", "DELHIVERY", "ABFRL", "PAGEIND", "RADICO", "GODREJPROP", "PRESTIGE", "OBEROIRLTY", "BRIGADE", "ADANIPOWER", "ADANIENSOL", "NTPCGREEN", "KPRMILL", "SUPREMEIND", "APLAPOLLO", "CESC", "NHPC", "SJVN", "JSWENERGY", "IPCALAB", "NATCOPHARM", "ABBOTINDIA", "MOTHERSON", "BHARATFORG", "BALKRISIND", "TIINDIA", "ABB", "SIEMENS", "BHEL", "THERMAX", "GRINDWELL", "MFSL", "IIFL", "ANGELONE", "MOTILALOFS", "VBL", "UBL", "CYIENT", "MASTEK", "PIIND", "VINATIORGA", "NAVINFLUOR", "POLICYBZR", "CARTRADE", "CAMPUS", "LTTS", "HAPPSTMNDS", "INTELLECT", "BIOCON", "SYNGENE", "JBCHEPHARM", "LAURUSLABS", "GRANULES", "ASTERDM", "METROPOLIS", "TMPV", "TMCV", "TVSMOTOR", "ASHOKLEYL", "ENDURANCE", "EXIDEIND", "AMARA", "CIEINDIA", "CANFINHOME", "AAVAS", "HOMEFIRST", "360ONE", "HDFCAMC", "ABCAPITAL", "MANAPPURAM", "SBICARDS", "JIOFIN", "PHOENIXLTD", "LODHA", "IGL", "MGL", "GUJENERGY", "DEEPAKNTR", "ALKYLAMINE", "FLUOROCHEM", "ASTRAL", "DMART", "PAGE", "KALYANKJIL", "SENCO", "JUBLFOOD", "HAL", "BEL", "CUMMINSIND", "BEML", "RATNAMANI", "VEDL", "HINDCOPPER", "JINDALSAW", "HUDCO", "IREDA", "CONCOR", "JYOTHYLAB", "POLYCAB", "KAYNES", "SYRMA", "TATACOMM", "ZEEL", "PVRINOX", "SWIGGY", "WAAREE", "PREMIERENE", "JSWINFRA", "BAJAJHFL", "HEXT", "ITCHOTELS", "INDUSTOWER", "JSL", "HYUNDAI"];
+const SYMS_P2=["NUVOCO", "KARURVYSYA", "CSBBANK", "EQUITASBNK", "UJJIVANSFB", "SURYODAY", "DCBBANK", "STARHEALTH", "NIACL", "GICRE", "ICICIPRU", "UTIAMC", "WEALTH", "ISEC", "IIFLCAPS", "EDELWEISS", "SBFC", "UGROCAP", "CREDITACC", "ARMANFIN", "SPANDANA", "FUSION", "PNBHOUSING", "APTUS", "INDIABULL", "HDFCSEC", "CHOLAHLDNG", "TATACHEM", "NOCIL", "PCBL", "DCMSHRIRAM", "ATUL", "BASF", "SUMICHEM", "GNFC", "CLEAN", "VINYSCORP", "HIKAL", "ROSSARI", "FINEORG", "SUPRIYA", "AETHER", "SUDARSCHEM", "TVSHLTD", "SUPRAJIT", "SUNDRMFAST", "NRBBEARING", "ASAHIINDIA", "SCHAEFFLER", "TIMKEN", "SKFINDIA", "ZENTEC", "IDEAFORGE", "MTAR", "ELIN", "MAZDOCK", "COCHINSHIP", "GRSE", "RPSGVENT", "SHREECEM", "HEIDELBERG", "WELSPUNLIV", "WELCORP", "NATIONALUM", "MOIL", "TATAMETALIK", "SHYAMMETL", "SOBHA", "KEYSTONE", "MAHLIFE", "SAREGAMA", "TIPS", "BALAJITELE", "NAZARA", "DELTACORP", "TVTODAY", "DBCORP", "GIPCL", "ATGL", "RPOWER", "ADANIGASP", "VARUN", "VSTIND", "PATANJALI", "RAYMOND", "VMART", "METROBRAND", "DEVYANI", "UNITDSPR", "HONAUT", "GILLETTE", "PGHH", "HAPPY", "BSOFT", "ZENSAR", "NIITLTD", "RATEGAIN", "TANLA", "JUSTDIAL", "REDINGTON", "EASEMYTRIP", "IXIGO", "GSHIP", "SCI", "GPPL", "CONCORD", "MAHLOG", "EPIGRAL", "GARFIBRES", "GOKUL", "SEQUENT", "MSTCLTD", "VSTTILLERS", "KIRLOSENGB", "WABAG", "NILAINFRA", "GLAND", "NEULANDLAB", "SPARC", "ERIS", "MEDANTA", "KRSNAA", "INOX", "GREENPANEL", "CENTURYPLY", "GREENPLY", "VARDHMAN", "TRIDENT", "ARVIND", "WELSPUN", "HLEGLAS", "BOMDYEING", "NETWORK18", "JAGRAN", "NSLNISP", "TATAINVEST", "BAJAJCON", "LANDMARK", "SAPPHIREFDS", "GLAXO", "PFIZER", "ASTRAZEN", "SANOFI", "3MINDIA", "CEATLTD", "MAPMYINDIA", "RITES", "THDC", "GMRAIRPORT", "ADANIAIRPORT", "TTML", "HFCL", "STLTECH", "VINDHYATEL", "TEJAS", "SOUTHBANK", "IOB", "UCOBANK", "CENTRALBNK", "MAHABANK", "JKBANK", "KARNATAKA", "TMBBANK", "CITYUNIONBK", "LAKSHVILAS", "AUBANK", "FINOPB", "NAINITAL", "ICICIB25", "LICNETFN5", "GOLDBEES", "LICHSGFIN", "REPCO", "SBICARD", "PAISALO", "AROHAN", "ASIANLEASIN", "OFSS", "HEXT", "BIRLASOFT", "ECLERX", "DATAMATICS", "TATATECH", "SONATASOFTW", "ROUTE", "NEWGEN", "NUCLEUS", "SAKSOFT", "QUICKHEAL", "WINDLAS", "SOLARA", "BLISSGVS", "NUVAXOVID", "OPTIEMUS", "FCONSUMER", "ALEMBICLTD", "FDC", "NATCOPHARM", "AMRUTANJAN", "AJANTPHARM", "SUVEN", "CAPLIPOINT", "SHILPAMED", "STRIDES", "MARKSANS", "LAURUSLABS", "DRREDDY", "NEOGEN", "CAMLIN", "INSECTICID", "DHANUKA", "RALLIS", "BAYER", "GHCL", "AKZONOBLE", "GUJALKALI", "IOLCP", "LXCHEM", "ARCHCHEM", "TRONOX", "CHEMPLAST", "ANUPAM", "NFIL", "SWANENERGY", "WABCOINDIA", "ZFCVINDIA", "BOSCHLTD", "SUNDARAM", "UNOMINDA", "MINDA", "GABRIEL", "JAMNA", "CRAFTSMAN", "SUBROS", "LUMAX", "SPIINDUS", "FABRINET", "ACCELYA", "MISHRA", "AEROFLEXIND", "SOLARINDS", "PARAS", "TEXMOPIPES", "TRIVENI", "KENNAMETAL", "ELGIEQUIP", "ISGEC", "PRAJ", "SPCENET", "BLS", "BHARAT", "APARINDS", "ELECON", "GRAPHITE", "HEG", "POWERINDIA", "CG", "VOLTAMP", "TDPOWERSYS", "INOXWIND", "SUZLON", "RNEWIND", "WINDWORLD", "GREENENERGY", "ORIENT", "BATA", "RELAXO", "VIPIND", "SAFARI", "SAMSONITE", "VIP", "WEDGWOOD", "THANGAMAYL", "GOLDIAM", "PCJEWELLER", "SHOPERSTOP", "INDIGOPNTS", "BAJAJELEC", "WHIRLPOOL", "SYMPHONY", "AMBER", "BLUESTAR", "HITACHI", "ONMOBILE", "PB", "XPRESSBEES", "VENKEYS", "TASTYBITESS", "HERITAGE", "DODLA", "HATSUN", "HPCL", "BPCL", "IOC", "MRPL", "CPCL", "ENNORE", "RAMASTEEL", "GALLANTT", "MSTEEL", "NILE", "JAYASWAL", "ISPAT", "MANAKSIA", "SHAREINDIA", "NCC", "HG", "KNR", "AHLUCONT", "DILIPBUILDCON", "PNCINFRA", "GESHIP", "GVK", "IRB", "MEP", "SADBHAV", "NBCC", "HINDPETRO", "PETRONET", "GAIL", "GSPL", "AEGASLTD", "ORIENTGREN", "BORORENEW", "KOLTEPATIL", "PURAVANKARA", "ARIHANTSUPR", "SUNTECK", "ELDECO", "KRISHNAVAL", "ASHIANA", "WPIL", "ANANTRAJ", "AMBUJACEM", "ACC", "BIRLACORPN", "SANGHI", "INDIACEM", "WCLGROUP", "KCP", "PRISMJOHNSN", "NCL", "SUNTV", "HATHWAY", "GTLINFRA", "DEN", "RUPA", "DOLLAR", "NAHAR", "NITIN", "SUTLEJTEX", "HIMATSEIDE", "SIYARAM", "BOMBDYEING", "INDHOTEL", "EIHOTEL", "MAHINDRA", "CHALET", "LEMONTRE", "YATRA", "MAKEMYTRIP", "BLUEDART", "GATEWAY", "ALLCARGO", "TCI", "TCNSCLOTH", "VRLLOGISTIC", "MAHINDLOG", "NAVKAR", "SNOWMAN", "UPL", "COROMANDEL", "CHAMBALFERT", "RCF", "FACT", "KSCL", "IFFCO", "ZUARI", "NFL", "RLFL", "JINDALSTEL", "JSPL", "JSWHL", "ESAFSFB", "INDIANB", "IDBI", "LALPATHLAB", "THYROCARE", "MAXHEALTH", "FORTIS", "FIVESTAR", "SHRIRAMFIN", "KFINTECH", "BSEIND", "RAILVIKAS", "SHARDACROP", "PRINCEPIPE", "KEI", "VGUARD", "FINOLEX", "CROMPTON", "GODREJIND", "BAJAJHLDNG", "KANSAINER", "AKZONOBEL", "JUBLPHARMA", "NATCO", "NESTLE", "COLGATE", "EMAMI", "KNRCON", "HCC", "KITEX", "LUXIND", "AIAENG", "CARBORUNIV", "SHALBY", "YATHARTH", "KIMS", "RAINBOW", "VIJAYABANK", "UJJIVAN", "EQUITAS", "CHOLAMAND", "BOI", "CENTRALBK", "ICICIPRULI", "BANKINDIA", "JKCEMENT", "RAMCOCEM", "POLYPLEX", "HAPPST", "YASHO", "VIDHIING", "CLEANSCITEC", "IONEXCHANG", "APOLLOMICRO", "DATAPATTNS", "BIKAJI", "DOMS", "AWFIS", "NESCO", "BLUEJET", "INDGN", "RRKABEL", "OLECTRA", "EXICOM", "WELENT", "GODIGIT", "EMIL", "GPIL"];
 const SYMS=SYMS_P1; // starts as P1; extended to full universe after bg load
 
 let AS=[],CT='sc',WP=0,SCH=null,ARE=true,CDI=null,CDS=180;
@@ -1155,10 +1156,6 @@ async function fetchS(sym) {
     let red = 0;
     for (let i = c_.length - 1; i > 0; i--) { if (c_[i] < c_[i-1]) red++; else break; }
 
-    const wkAgo = c_[c_.length - 6] || c_[0];
-    const wkChgRaw = wkAgo > 0 ? ((price - wkAgo) / wkAgo) * 100 : 0;
-    const wkChg = Math.max(-40, Math.min(40, wkChgRaw)); // sanity cap ±40%
-
     const sr = src(c_, h_, l_, price);
 
     // Build weekly candles from daily data (aggregate every 5 days)
@@ -1170,6 +1167,12 @@ async function fetchS(sym) {
         c: wc[wc.length - 1], v: wv.reduce((a, b) => a + b, 0)
       });
     }
+
+    // Week change: prior completed weekly candle close vs current price
+    // Must be computed AFTER wkly is built above
+    const wkAgo = wkly.length >= 2 ? wkly[wkly.length - 2].c : (c_.length >= 6 ? c_[c_.length - 6] : c_[0]);
+    const wkChgRaw = wkAgo > 0 ? ((price - wkAgo) / wkAgo) * 100 : 0;
+    const wkChg = Math.max(-40, Math.min(40, wkChgRaw)); // sanity cap ±40%
 
     // Filter timestamps to match valid OHLCV indices
     const rawTs = res.timestamp || [];
@@ -2080,6 +2083,7 @@ let BRK_SUB = 'daily';  // daily | weekly | monthly | yearly
 let RNG_SUB = 'daily';
 let MYR_SUB = 'breakout'; // breakout | support
 let PAT_SUB = 'inside';    // inside | flag | asc_tri | desc_tri
+let PAT_TF  = 'weekly';    // weekly | monthly | yearly  (only used for inside bar)
 
 function setTF(tf){
   ACTIVE_TF=tf;
@@ -2371,7 +2375,7 @@ function bgBadge(loading, pct, total){
 
 function startARI(){if(ALI)clearInterval(ALI);ALI=setInterval(chkAlerts,30000);}
 
-function gt(t){CT=t;document.querySelectorAll('.ntab').forEach(e=>e.classList.remove('active'));const e=document.getElementById('t-'+t);if(e)e.classList.add('active');document.getElementById('cbar').style.display=t==='sc'?'flex':'none';document.getElementById('tf-panel').style.display=t==='sc'?'block':'none';const fn={sc:rs,fo:rFnO,fi:rFII,ro:rRot,ca:rCal,nw:rNews,bt:rBT,ps:rPS,jn:rJnl,sg:rSG,ai:rAI,nf:rNifty,cr:rCrypto,iv:rInvest};if(fn[t])fn[t]();}
+function gt(t){CT=t;document.querySelectorAll('.ntab').forEach(e=>e.classList.remove('active'));const e=document.getElementById('t-'+t);if(e)e.classList.add('active');document.getElementById('cbar').style.display=t==='sc'?'flex':'none';document.getElementById('tf-panel').style.display=t==='sc'?'block':'none';const fn={sc:rs,fo:rFnO,fi:rFII,ro:rRot,ca:rCal,nw:rNews,bt:rBT,ps:rPS,jn:rJnl,sg:rSG,ai:rAI,nf:rNifty,cr:rCrypto,iv:rInvest,op:rOptions};if(fn[t])fn[t]();}
 
 function getSD(){const m={};AS.forEach(s=>{const sec=s.sector||'Others';if(!m[sec])m[sec]={n:0,d:0,w:0};m[sec].n++;m[sec].d+=s.pctChange;m[sec].w+=s.weekChg||0;});return Object.entries(m).map(([name,d])=>{const avgD=d.d/d.n,avgW=d.w/d.n;const state=avgW>1.5?'Momentum':avgW<-1.5?'Selling':Math.abs(avgW)<0.5?'Ranging':'Recovering';return{name,avgD,avgW,state};}).sort((a,b)=>b.avgW-a.avgW);}
 
@@ -4648,6 +4652,36 @@ function rNifty() {
       </div>
     </div>
 
+    <!-- ── PCR / OI / Max Pain Section ── -->
+    <div style="background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(124,58,237,.05));
+                border:1px solid rgba(168,85,247,.25);border-radius:14px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div>
+          <div style="font-size:.84rem;font-weight:800;color:var(--text)">⚡ Options: PCR · OI · Max Pain</div>
+          <div style="font-size:.65rem;color:var(--muted2);margin-top:2px">
+            Live NSE option chain · Support & resistance from OI · Market direction signal
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="nf-opt-sym" class="c" style="font-size:.72rem;padding:5px 8px">
+            <option value="NIFTY" selected>NIFTY 50</option>
+            <option value="BANKNIFTY">BANK NIFTY</option>
+            <option value="FINNIFTY">FIN NIFTY</option>
+          </select>
+          <button onclick="nfOptFetch()" id="nf-opt-btn"
+            style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;
+                   padding:6px 16px;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer">
+            ⚡ Load OI
+          </button>
+        </div>
+      </div>
+      <div id="nf-opt-result">
+        <div style="font-size:.68rem;color:var(--muted2);text-align:center;padding:10px">
+          Click <strong style="color:#a855f7">⚡ Load OI</strong> to fetch live NSE option chain data
+        </div>
+      </div>
+    </div>
+
     <!-- ── AI Strategy + FVG/SMC Analysis (below) ── -->
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:14px">
       <div style="font-size:.76rem;font-weight:700;color:var(--text);margin-bottom:10px">📐 AI Intraday Strategy</div>
@@ -6160,6 +6194,45 @@ function myrSupportCard(s) {
 //    - At least 3 touches of support + 2 declining highs
 //    - Bearish pattern BUT at major support = high R:R reversal watch
 
+// ── Candle aggregators for inside bar monthly/yearly ─────────────────────────
+function buildMonthlyCandles(daily) {
+  // Aggregate daily OHLCV into ~21-day monthly candles
+  const { c, h, l, v } = daily;
+  const monthly = [];
+  const step = 21; // ~1 month of trading days
+  for (let i = 0; i + step - 1 < c.length; i += step) {
+    const sc = c.slice(i, i + step), sh = h.slice(i, i + step);
+    const sl = l.slice(i, i + step), sv = v.slice(i, i + step);
+    monthly.push({
+      o: sc[0],
+      h: Math.max(...sh),
+      l: Math.min(...sl),
+      c: sc[sc.length - 1],
+      v: sv.reduce((a, b) => a + b, 0)
+    });
+  }
+  return monthly;
+}
+
+function buildYearlyCandles(daily) {
+  // Aggregate daily OHLCV into ~252-day yearly candles
+  const { c, h, l, v } = daily;
+  const yearly = [];
+  const step = 252; // ~1 year of trading days
+  for (let i = 0; i + step - 1 < c.length; i += step) {
+    const sc = c.slice(i, i + step), sh = h.slice(i, i + step);
+    const sl = l.slice(i, i + step), sv = v.slice(i, i + step);
+    yearly.push({
+      o: sc[0],
+      h: Math.max(...sh),
+      l: Math.min(...sl),
+      c: sc[sc.length - 1],
+      v: sv.reduce((a, b) => a + b, 0)
+    });
+  }
+  return yearly;
+}
+
 function patSubRow(active) {
   const pats = [
     { k:'inside',   label:'📦 Inside Bar',         desc:'Big candle → inside compression' },
@@ -6181,19 +6254,48 @@ function patSubRow(active) {
   </div>`;
 }
 
+function patInsideTFRow(active) {
+  const tfs = [
+    { k:'weekly',  label:'📅 Weekly',  desc:'~5-day candles' },
+    { k:'monthly', label:'🗓 Monthly', desc:'~21-day candles' },
+    { k:'yearly',  label:'🏆 Yearly',  desc:'~252-day candles' },
+  ];
+  return `<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+    ${tfs.map(t => `<button onclick="PAT_TF='${t.k}';rsPAT()"
+      style="padding:4px 12px;border-radius:7px;font-size:.68rem;font-weight:700;cursor:pointer;
+             border:1px solid ${active===t.k?'#e879f9':'var(--border2)'};
+             background:${active===t.k?'rgba(232,121,249,.18)':'var(--card2)'};
+             color:${active===t.k?'#f5d0fe':'var(--muted2)'};transition:all .15s">
+      ${t.label}
+      <div style="font-size:.56rem;font-weight:400;opacity:.7;margin-top:1px">${t.desc}</div>
+    </button>`).join('')}
+  </div>`;
+}
+
 function rsPAT() {
   if(CT !== 'sc') return;
   const mode = PAT_SUB;
   const area = document.getElementById('area');
 
+  const tfLabels = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
+  const tfDesc   = {
+    weekly:  'weekly candles · ~100 bars · 2yr data',
+    monthly: 'monthly candles · ~24 bars · 2yr data',
+    yearly:  'yearly candles · multi-year data',
+  };
+
   const modeInfo = {
-    inside:   { icon:'📦', name:'Inside Bar / Compression',  color:'#e879f9', desc:'Big bullish weekly candle followed by 2+ inside candles — coiled spring setup' },
+    inside:   { icon:'📦', name:'Inside Bar / Compression',  color:'#e879f9', desc:`Big bullish ${mode==='inside'?(tfLabels[PAT_TF]||'Weekly').toLowerCase():''} candle followed by 1+ inside candles — coiled spring setup` },
     flag:     { icon:'🚩', name:'Bull Flag Pattern',          color:'#f59e0b', desc:'Strong impulse (pole) followed by tight parallel pullback — continuation setup' },
     asc_tri:  { icon:'📐', name:'Ascending Triangle',         color:'#22d3ee', desc:'Flat resistance + rising lows — buyers getting more aggressive, breakout imminent' },
     desc_tri: { icon:'📉', name:'Descending Triangle',        color:'#f87171', desc:'Flat support + declining highs — watch for breakdown or reversal at support' },
     sym_tri:  { icon:'🔺', name:'Symmetrical Triangle',      color:'#a3e635', desc:'Declining highs + rising lows converging — breakout imminent, direction follows trend' },
   };
   const mi = modeInfo[mode];
+
+  // For inside bar, compute timeframe-specific label
+  const insideTFLabel = mode === 'inside' ? (tfLabels[PAT_TF] || 'Weekly') : 'Weekly';
+  const insideTFDesc  = mode === 'inside' ? (tfDesc[PAT_TF] || tfDesc.weekly) : tfDesc.weekly;
 
   area.innerHTML = `
     <div style="background:${mi.color}14;border:1px solid ${mi.color}30;
@@ -6204,11 +6306,12 @@ function rsPAT() {
           <div style="font-size:.88rem;font-weight:800;color:var(--text)">${mi.name}</div>
           <div style="font-size:.67rem;color:var(--muted2);margin-top:2px">${mi.desc}</div>
         </div>
-        <div style="font-size:.64rem;color:var(--muted2);text-align:right">Weekly candles<br>~100 bars · 2yr data</div>
+        <div style="font-size:.64rem;color:var(--muted2);text-align:right">${insideTFLabel} candles<br>${insideTFDesc}</div>
       </div>
+      ${mode === 'inside' ? patInsideTFRow(PAT_TF) : ''}
     </div>
     <div id="pat-status" style="font-size:.7rem;color:var(--muted2);margin-bottom:10px">
-      ⏳ Scanning ${AS.length} stocks for ${mi.name} on weekly charts…
+      ⏳ Scanning ${AS.length} stocks for ${mi.name} on ${insideTFLabel.toLowerCase()} charts…
     </div>
     <div id="pat-results"></div>`;
 
@@ -6222,15 +6325,15 @@ function rsPAT() {
     if (!results.length) {
       statusEl.textContent = '';
       resEl.innerHTML = `<div class="ibox" style="color:var(--yellow)">
-        No ${mi.name} patterns found right now. Patterns require specific price structure —
-        try other pattern types or check again after more weekly candles form.
+        No ${mi.name} patterns found right now on ${insideTFLabel.toLowerCase()} candles.
+        Try a different timeframe or check again after more candles form.
       </div>`;
       return;
     }
 
     statusEl.innerHTML = `<span style="color:var(--green)">✓</span>
       <strong style="color:var(--text)">${results.length} stocks</strong>
-      showing ${mi.name} on weekly chart · sorted by quality score`;
+      showing ${mi.name} on ${insideTFLabel.toLowerCase()} charts · sorted by quality score`;
 
     resEl.innerHTML = `<div class="grid">${results.slice(0, 40).map(s => patCardHTML(s, mode, mi)).join('')}</div>`;
   }, 40);
@@ -6244,7 +6347,24 @@ function patScan(mode) {
     if (s.mcap > 0 && s.mcap < 800e7) continue;
 
     let result = null;
-    if      (mode === 'inside')   result = patDetectInside(s);
+    if (mode === 'inside') {
+      // Build correct candle array based on PAT_TF
+      let candles;
+      let tfLabel;
+      if (PAT_TF === 'monthly' && s.daily) {
+        candles  = buildMonthlyCandles(s.daily);
+        tfLabel  = 'monthly';
+      } else if (PAT_TF === 'yearly' && s.daily) {
+        candles  = buildYearlyCandles(s.daily);
+        tfLabel  = 'yearly';
+      } else {
+        candles  = s.weekly;
+        tfLabel  = 'weekly';
+      }
+      if (candles && candles.length >= 4) {
+        result = patDetectInside(s, candles, tfLabel);
+      }
+    }
     else if (mode === 'flag')     result = patDetectFlag(s);
     else if (mode === 'asc_tri')  result = patDetectAscTri(s);
     else if (mode === 'desc_tri') result = patDetectDescTri(s);
@@ -6256,27 +6376,38 @@ function patScan(mode) {
 }
 
 // ── 1. Inside Bar / Compression ───────────────────────────────────────────────
-function patDetectInside(s) {
-  const wk = s.weekly;
+// candles: weekly/monthly/yearly array. tfLabel: 'weekly'|'monthly'|'yearly'
+function patDetectInside(s, candles, tfLabel) {
+  candles  = candles  || s.weekly;
+  tfLabel  = tfLabel  || 'weekly';
+  const wk = candles;
   const n  = wk.length;
-  if (n < 8) return null;
+  if (n < 4) return null;
 
-  // Compute avg body size over last 20 weekly candles
-  const recent20 = wk.slice(-20);
+  // TF-specific settings
+  const tfCfg = {
+    weekly:  { scanBack: 15, minBarsAgo: 4,  recentThresh: 8,  unit: 'wk' },
+    monthly: { scanBack: 12, minBarsAgo: 3,  recentThresh: 6,  unit: 'mo' },
+    yearly:  { scanBack: 8,  minBarsAgo: 2,  recentThresh: 4,  unit: 'yr' },
+  };
+  const cfg = tfCfg[tfLabel] || tfCfg.weekly;
+
+  // Compute avg body size over available candles (up to last 20)
+  const recent20 = wk.slice(-Math.min(20, n));
   const avgBody  = recent20.reduce((a, b) => a + Math.abs(b.c - b.o), 0) / recent20.length;
 
-  // Scan last 15 weekly candles for a "mother bar" (big bullish)
-  for (let i = n - 15; i < n - 2; i++) {
-    const mb     = wk[i];
-    const mbBody = mb.c - mb.o;       // positive = bullish
-    const mbRange= mb.h - mb.l;
+  // Scan last N candles for a "mother bar" (big bullish)
+  for (let i = Math.max(0, n - cfg.scanBack); i < n - 1; i++) {
+    const mb      = wk[i];
+    const mbBody  = mb.c - mb.o;   // positive = bullish
+    const mbRange = mb.h - mb.l;
 
-    // Mother bar must be: bullish, large body (>= 1.8x avg), close in upper 30% of range
-    if (mbBody < avgBody * 1.8)    continue;
-    if (mbBody < 0)                continue;
-    if (mbRange <= 0)              continue;
+    // Mother bar: bullish, large body (>= 1.8x avg), close in upper 60% of range
+    if (mbBody < avgBody * 1.8) continue;
+    if (mbBody < 0)             continue;
+    if (mbRange <= 0)           continue;
     const closePos = (mb.c - mb.l) / mbRange;
-    if (closePos < 0.60)           continue;
+    if (closePos < 0.60)        continue;
 
     // Count consecutive inside bars after mother bar
     let insideCount = 0;
@@ -6285,36 +6416,38 @@ function patDetectInside(s) {
       if (bar.h <= mb.h && bar.l >= mb.l) {
         insideCount++;
       } else {
-        break;  // inside bar sequence broken
+        break;
       }
     }
 
-    if (insideCount < 1) continue;  // need at least 1 inside bar
+    if (insideCount < 1) continue;
 
-    // How many bars ago was the mother bar
     const barsAgo = n - 1 - i;
 
-    // Score: more inside bars = better compression, recent = better
+    // Score
     let score = 50;
-    score += Math.min(insideCount, 4) * 10;   // up to +40 for 4+ inside bars
-    score += barsAgo <= 4 ? 15 : barsAgo <= 8 ? 8 : 0;
+    score += Math.min(insideCount, 4) * 10;
+    score += barsAgo <= cfg.minBarsAgo ? 15 : barsAgo <= cfg.recentThresh ? 8 : 0;
     if (s.rsi && s.rsi > 50 && s.rsi < 75) score += 8;
     if (s.e20 && s.price > s.e20)           score += 7;
     score = Math.min(100, score);
 
-    // ATR-based levels
+    // ATR-based levels from daily data
     const atr = patATR(s.daily?.h||[], s.daily?.l||[], s.daily?.c||[], 14);
+
+    const mbGainPct = mbBody > 0 && mb.o > 0 ? ((mb.c - mb.o) / mb.o * 100).toFixed(1) : '?';
 
     return {
       pattern: 'inside',
+      tfLabel,
       score,
       insideCount,
       barsAgo,
-      motherBar:  { o: +mb.o.toFixed(2), h: +mb.h.toFixed(2), l: +mb.l.toFixed(2), c: +mb.c.toFixed(2) },
-      entry:      +mb.h.toFixed(2),           // buy on break of mother bar high
-      sl:         +(mb.l - atr * 0.3).toFixed(2),  // below mother bar low
-      target:     +(mb.h + (mb.h - mb.l) * 1.2).toFixed(2), // 1.2x mother bar range above
-      detail:     `${insideCount} inside bar${insideCount>1?'s':''} after big ${((mb.c-mb.o)/mb.o*100).toFixed(1)}% weekly candle (${barsAgo}wk ago)`,
+      motherBar: { o: +mb.o.toFixed(2), h: +mb.h.toFixed(2), l: +mb.l.toFixed(2), c: +mb.c.toFixed(2) },
+      entry:     +mb.h.toFixed(2),
+      sl:        +(mb.l - atr * 0.3).toFixed(2),
+      target:    +(mb.h + (mb.h - mb.l) * 1.2).toFixed(2),
+      detail:    `${insideCount} inside bar${insideCount>1?'s':''} after big ${mbGainPct}% ${tfLabel} candle (${barsAgo}${cfg.unit} ago)`,
     };
   }
   return null;
@@ -6706,7 +6839,7 @@ function patCardHTML(s, mode, mi) {
     patVisual = `
       <div style="background:${col}0d;border:1px solid ${col}20;border-radius:8px;padding:9px 11px;margin-bottom:9px">
         <div style="font-size:.62rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">
-          Pattern · ${p.insideCount} inside bar${p.insideCount>1?'s':''} · ${p.barsAgo}wk ago
+          Pattern · ${p.insideCount} inside bar${p.insideCount>1?'s':''} · ${p.detail?.match(/\d+ (wk|mo|yr) ago/)?.[0] || p.barsAgo+'wk ago'}
         </div>
         <!-- Mini candlestick visual -->
         <div style="display:flex;align-items:flex-end;gap:4px;height:36px;margin-bottom:6px">
@@ -8493,7 +8626,7 @@ function btCompute(tf, stratKey) {
         h52:     Math.max(...c_.slice(-252)),
         l52:     Math.min(...c_.slice(-252)),
         redDays: (() => { let r=0; for(let i=c_.length-1;i>0;i--){if(c_[i]<c_[i-1])r++;else break;} return r; })(),
-        weekChg: c_.length>=6 ? ((ep - c_[c_.length-6])/c_[c_.length-6])*100 : 0,
+        weekChg: wkly.length>=2 ? ((ep - wkly[wkly.length-2].c)/wkly[wkly.length-2].c)*100 : (c_.length>=6 ? ((ep - c_[c_.length-6])/c_[c_.length-6])*100 : 0),
         sr:      src(c_, h_, l_, ep),
         daily:   { c:c_, h:h_, l:l_, v:v_ },
         weekly:  wkly,
@@ -8904,6 +9037,421 @@ window.addEventListener('appinstalled', () => {
   document.getElementById('pwa-banner').style.display = 'none';
   toast('✅ App installed to home screen!', 'i');
 });
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OPTIONS TAB — PCR · OI Analysis · Max Pain · Market Direction
+// Data source: NSE India public option chain API (no auth required)
+// ══════════════════════════════════════════════════════════════════════════════
+
+let OPT_STATE = { symbol: 'NIFTY', loading: false, data: null, error: null };
+const OPT_SYMBOLS = ['NIFTY','BANKNIFTY','FINNIFTY','MIDCPNIFTY','SENSEX'];
+
+async function rOptions() {
+  const area = document.getElementById('area');
+  area.innerHTML = `
+    <div class="sh">⚡ Options Chain Analysis
+      <div class="sh-line"></div>
+      <span style="font-size:.63rem;color:var(--muted2)">PCR · OI buildup · Max Pain · Support & Resistance</span>
+    </div>
+
+    <!-- Symbol selector -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div>
+          <label style="font-size:.6rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px">Index / Stock</label>
+          <select id="opt-sym" class="c" style="font-size:.78rem;padding:8px 10px" onchange="OPT_STATE.symbol=this.value">
+            ${OPT_SYMBOLS.map(s=>`<option value="${s}" ${s===OPT_STATE.symbol?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <button onclick="optFetch()" id="opt-btn"
+          style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;
+                 padding:9px 22px;border-radius:10px;font-size:.8rem;font-weight:700;cursor:pointer;margin-top:18px">
+          ⚡ Analyze
+        </button>
+        <div style="font-size:.62rem;color:var(--muted2);margin-top:18px;line-height:1.6">
+          Live NSE data · PCR · Max Pain · OI heatmap · Market direction signal
+        </div>
+      </div>
+    </div>
+    <div id="opt-result">
+      <div class="ibox" style="color:var(--muted2);text-align:center">
+        Select an index and tap <strong style="color:#a855f7">⚡ Analyze</strong> to load options data
+      </div>
+    </div>`;
+}
+
+async function optFetch() {
+  const sym = document.getElementById('opt-sym')?.value || 'NIFTY';
+  OPT_STATE.symbol = sym;
+  const btn    = document.getElementById('opt-btn');
+  const resEl  = document.getElementById('opt-result');
+  if (!resEl) return;
+
+  btn.disabled = true; btn.textContent = '⏳ Loading…';
+  resEl.innerHTML = `<div class="ibox" style="text-align:center;color:var(--muted2)">⏳ Fetching NSE option chain for ${sym}…</div>`;
+
+  try {
+    // NSE public option chain — proxied through our backend to avoid CORS
+    const r = await fetch(`${PROXY_BASE}/api/option-chain?symbol=${encodeURIComponent(sym)}`, {
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    resEl.innerHTML = optRender(d, sym);
+  } catch(e) {
+    resEl.innerHTML = `<div class="ibox" style="color:var(--red)">❌ ${e.message}<br>
+      <span style="font-size:.65rem;color:var(--muted2)">NSE data may be unavailable outside market hours or server may need a restart.</span></div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ Analyze';
+  }
+}
+
+function optRender(d, sym) {
+  const { pcr, maxPain, spotPrice, expiry, topCE, topPE,
+          ceOI, peOI, totalCEOI, totalPEOI,
+          supports, resistances, signal, signalDetail,
+          strikes } = d;
+
+  // Signal color
+  const sigColor = signal === 'BULLISH' ? 'var(--green)' :
+                   signal === 'BEARISH' ? 'var(--red)'   : 'var(--yellow)';
+  const sigIcon  = signal === 'BULLISH' ? '🟢' :
+                   signal === 'BEARISH' ? '🔴'  : '🟡';
+  const sigBg    = signal === 'BULLISH' ? 'rgba(0,212,154,.08)' :
+                   signal === 'BEARISH' ? 'rgba(255,69,96,.08)' : 'rgba(245,197,24,.08)';
+  const sigBorder= signal === 'BULLISH' ? 'rgba(0,212,154,.25)' :
+                   signal === 'BEARISH' ? 'rgba(255,69,96,.25)' : 'rgba(245,197,24,.25)';
+
+  return `
+    <!-- Market Direction Signal — top card -->
+    <div style="background:${sigBg};border:2px solid ${sigBorder};border-radius:16px;padding:16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="font-size:1.6rem">${sigIcon}</span>
+        <div>
+          <div style="font-size:1rem;font-weight:800;color:${sigColor}">${signal} BIAS</div>
+          <div style="font-size:.68rem;color:var(--muted2)">${sym} · Expiry: ${expiry} · Spot: ₹${spotPrice?.toLocaleString('en-IN')}</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:1.4rem;font-weight:800;color:${sigColor}">${pcr?.toFixed(2)}</div>
+          <div style="font-size:.6rem;color:var(--muted2)">PCR</div>
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted2);line-height:1.7">${signalDetail}</div>
+    </div>
+
+    <!-- Key metrics grid -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px;text-align:center">
+        <div style="font-size:.6rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">PCR</div>
+        <div style="font-size:1.3rem;font-weight:800;color:${pcr>=1?'var(--green)':'var(--red)'}">${pcr?.toFixed(2)}</div>
+        <div style="font-size:.58rem;color:var(--muted2)">${pcr>=1.2?'Oversold — bullish':pcr>=0.8?'Neutral':'Overbought — bearish'}</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px;text-align:center">
+        <div style="font-size:.6rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Max Pain</div>
+        <div style="font-size:1.3rem;font-weight:800;color:#a855f7">₹${maxPain?.toLocaleString('en-IN')}</div>
+        <div style="font-size:.58rem;color:var(--muted2)">${Math.abs(spotPrice-maxPain)<50?'Near max pain':'${spotPrice>maxPain?"Above":"Below"} by ${Math.abs(spotPrice-maxPain).toFixed(0)}'}</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px;text-align:center">
+        <div style="font-size:.6rem;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">CE/PE OI</div>
+        <div style="font-size:1rem;font-weight:800;color:var(--text)">${(totalCEOI/1e5).toFixed(1)}L</div>
+        <div style="font-size:.65rem;color:var(--muted2)">${(totalPEOI/1e5).toFixed(1)}L PE</div>
+      </div>
+    </div>
+
+    <!-- PCR gauge -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:.7rem;font-weight:700;color:var(--text);margin-bottom:10px">📊 PCR Interpretation</div>
+      <div style="position:relative;height:8px;background:linear-gradient(to right,#ff6b6b,#ffd93d,#6bcb77);border-radius:4px;margin-bottom:6px">
+        <div style="position:absolute;top:-4px;width:2px;height:16px;background:#fff;border-radius:2px;
+                    left:${Math.min(Math.max((pcr/2)*100,2),98)}%;transform:translateX(-50%)"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.58rem;color:var(--muted2)">
+        <span>0 (Overbought)</span><span>0.7 (Neutral)</span><span>1.0</span><span>1.5+ (Oversold)</span>
+      </div>
+      <div style="font-size:.68rem;color:var(--muted2);margin-top:10px;line-height:1.7">
+        <strong style="color:var(--text)">PCR ${pcr?.toFixed(2)}:</strong>
+        ${pcr >= 1.3 ? '🟢 High PCR — more puts being bought than calls. Market makers are net long. Historically bullish for next session.' :
+          pcr >= 1.0 ? '🟡 PCR above 1 — slight put bias. Cautiously bullish. Watch for breakout above resistance.' :
+          pcr >= 0.7 ? '🟡 Neutral PCR — balanced call/put OI. Market directionless. Wait for breakout.' :
+          '🔴 Low PCR — call writing dominant. Bearish bias. Sellers in control.'}
+      </div>
+    </div>
+
+    <!-- Support & Resistance from OI -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:.7rem;font-weight:700;color:var(--text);margin-bottom:12px">🎯 OI-Based Support & Resistance</div>
+      <div style="font-size:.65rem;color:var(--muted2);margin-bottom:10px;line-height:1.6">
+        Strikes with highest OI act as <strong style="color:var(--red)">resistance</strong> (max call writing = ceiling) 
+        and <strong style="color:var(--green)">support</strong> (max put writing = floor). 
+        Market makers defend these levels.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <!-- Resistances (top CE OI) -->
+        <div>
+          <div style="font-size:.63rem;color:var(--red);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🔴 Resistance (CE Wall)</div>
+          ${resistances.map((r,i) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;
+                      padding:7px 10px;margin-bottom:5px;border-radius:8px;
+                      background:rgba(255,69,96,${0.12-i*0.03});border:1px solid rgba(255,69,96,${0.25-i*0.06})">
+            <div>
+              <div style="font-size:.78rem;font-weight:800;color:var(--text)">₹${r.strike.toLocaleString('en-IN')}</div>
+              <div style="font-size:.58rem;color:var(--muted2)">${(r.oi/1e5).toFixed(1)}L OI</div>
+            </div>
+            <div style="font-size:.62rem;color:var(--red);font-weight:700">${i===0?'KEY':'#'+(i+1)}</div>
+          </div>`).join('')}
+        </div>
+        <!-- Supports (top PE OI) -->
+        <div>
+          <div style="font-size:.63rem;color:var(--green);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🟢 Support (PE Wall)</div>
+          ${supports.map((s,i) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;
+                      padding:7px 10px;margin-bottom:5px;border-radius:8px;
+                      background:rgba(0,212,154,${0.12-i*0.03});border:1px solid rgba(0,212,154,${0.25-i*0.06})">
+            <div>
+              <div style="font-size:.78rem;font-weight:800;color:var(--text)">₹${s.strike.toLocaleString('en-IN')}</div>
+              <div style="font-size:.58rem;color:var(--muted2)">${(s.oi/1e5).toFixed(1)}L OI</div>
+            </div>
+            <div style="font-size:.62rem;color:var(--green);font-weight:700">${i===0?'KEY':'#'+(i+1)}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:10px;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:8px;font-size:.67rem;color:var(--muted2);line-height:1.7">
+        <strong style="color:#a855f7">Max Pain ₹${maxPain?.toLocaleString('en-IN')}:</strong>
+        The strike where maximum option buyers lose money at expiry. Price tends to gravitate toward max pain as expiry nears.
+        ${spotPrice > maxPain ? `Market is <strong style="color:var(--red)">${(spotPrice-maxPain).toFixed(0)} pts above</strong> max pain — mild downward pull expected.` :
+          spotPrice < maxPain ? `Market is <strong style="color:var(--green)">${(maxPain-spotPrice).toFixed(0)} pts below</strong> max pain — mild upward pull expected.` :
+          'Market is <strong style="color:var(--yellow)">at max pain</strong> — sideways expected near expiry.'}
+      </div>
+    </div>
+
+    <!-- OI Heatmap -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:.7rem;font-weight:700;color:var(--text);margin-bottom:10px">🔥 OI Heatmap (Strikes near spot)</div>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:4px;font-size:.6rem">
+        <div style="text-align:center;color:var(--green);font-weight:700;padding:4px">PUT OI ↑</div>
+        <div style="text-align:center;color:var(--muted2);font-weight:700;padding:4px">STRIKE</div>
+        <div style="text-align:center;color:var(--red);font-weight:700;padding:4px">CALL OI ↑</div>
+      </div>
+      ${strikes.map(row => {
+        const isSpot = Math.abs(row.strike - spotPrice) < (sym==='NIFTY'?26:51);
+        const maxOI  = Math.max(...strikes.map(r=>Math.max(r.ceOI,r.peOI)));
+        const ceW    = maxOI > 0 ? (row.ceOI/maxOI*100) : 0;
+        const peW    = maxOI > 0 ? (row.peOI/maxOI*100) : 0;
+        return `
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:4px;align-items:center;
+                    margin-bottom:3px;${isSpot?'background:rgba(168,85,247,.12);border-radius:6px;padding:2px 4px;':''}}">
+          <!-- PE bar (left) -->
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px">
+            <span style="font-size:.58rem;color:var(--muted2)">${(row.peOI/1e5).toFixed(1)}L</span>
+            <div style="height:14px;width:${Math.max(peW,1).toFixed(0)}%;max-width:90%;background:rgba(0,212,154,.5);border-radius:3px 0 0 3px;min-width:2px"></div>
+          </div>
+          <!-- Strike -->
+          <div style="font-size:.68rem;font-weight:${isSpot?'800':'600'};color:${isSpot?'#a855f7':'var(--text)'};text-align:center;min-width:52px">
+            ${isSpot?'▶ ':''}${row.strike.toLocaleString('en-IN')}${isSpot?' ◀':''}
+          </div>
+          <!-- CE bar (right) -->
+          <div style="display:flex;align-items:center;gap:4px">
+            <div style="height:14px;width:${Math.max(ceW,1).toFixed(0)}%;max-width:90%;background:rgba(255,69,96,.5);border-radius:0 3px 3px 0;min-width:2px"></div>
+            <span style="font-size:.58rem;color:var(--muted2)">${(row.ceOI/1e5).toFixed(1)}L</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- OI Change Analysis -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:.7rem;font-weight:700;color:var(--text);margin-bottom:8px">📈 OI Change — What Smart Money is Doing</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.2);border-radius:10px;padding:10px">
+          <div style="font-size:.62rem;color:var(--red);font-weight:700;margin-bottom:6px">📈 TOP CALL OI BUILD</div>
+          ${topCE.map(r=>`<div style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--muted2);margin-bottom:3px">
+            <span style="color:var(--text);font-weight:700">₹${r.strike.toLocaleString('en-IN')}</span>
+            <span style="color:var(--red)">+${(r.oiChange/1e5).toFixed(1)}L</span>
+          </div>`).join('')}
+          <div style="font-size:.6rem;color:var(--muted2);margin-top:6px;line-height:1.5">↑ Writers adding — these are resistance levels sellers are defending</div>
+        </div>
+        <div style="background:rgba(0,212,154,.06);border:1px solid rgba(0,212,154,.2);border-radius:10px;padding:10px">
+          <div style="font-size:.62rem;color:var(--green);font-weight:700;margin-bottom:6px">📉 TOP PUT OI BUILD</div>
+          ${topPE.map(r=>`<div style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--muted2);margin-bottom:3px">
+            <span style="color:var(--text);font-weight:700">₹${r.strike.toLocaleString('en-IN')}</span>
+            <span style="color:var(--green)">+${(r.oiChange/1e5).toFixed(1)}L</span>
+          </div>`).join('')}
+          <div style="font-size:.6rem;color:var(--muted2);margin-top:6px;line-height:1.5">↑ Writers adding — these are support levels buyers are defending</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simple Summary -->
+    <div style="background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-radius:12px;padding:14px">
+      <div style="font-size:.72rem;font-weight:700;color:#a855f7;margin-bottom:8px">💡 In Simple Terms</div>
+      <div style="font-size:.71rem;color:var(--muted2);line-height:1.9">
+        ${signalDetail}
+      </div>
+    </div>`;
+}
+
+
+
+// ── Nifty Options: PCR / OI / Max Pain (inside Nifty tab) ────────────────────
+async function nfOptFetch() {
+  const sym   = document.getElementById('nf-opt-sym')?.value || 'NIFTY';
+  const btn   = document.getElementById('nf-opt-btn');
+  const resEl = document.getElementById('nf-opt-result');
+  if (!resEl) return;
+
+  btn.disabled = true; btn.textContent = '⏳ Loading…';
+  resEl.innerHTML = `<div style="font-size:.68rem;color:var(--muted2);text-align:center;padding:12px">
+    ⏳ Fetching NSE option chain for ${sym}…</div>`;
+
+  try {
+    const r = await fetch(`${PROXY_BASE}/api/option-chain?symbol=${encodeURIComponent(sym)}`, {
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    resEl.innerHTML = nfOptRender(d);
+  } catch(e) {
+    resEl.innerHTML = `<div style="font-size:.68rem;color:var(--red);padding:8px">
+      ❌ ${e.message}<br>
+      <span style="color:var(--muted2)">NSE option chain is available during market hours (9:15–15:30 IST).</span>
+    </div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ Load OI';
+  }
+}
+
+function nfOptRender(d) {
+  const { pcr, maxPain, spotPrice, expiry, topCE, topPE,
+          totalCEOI, totalPEOI, resistances, supports,
+          signal, signalDetail, strikes } = d;
+
+  const sigColor  = signal === 'BULLISH' ? 'var(--green)' : signal === 'BEARISH' ? 'var(--red)' : 'var(--yellow)';
+  const sigIcon   = signal === 'BULLISH' ? '🟢' : signal === 'BEARISH' ? '🔴' : '🟡';
+  const pcrColor  = pcr >= 1.2 ? 'var(--green)' : pcr <= 0.8 ? 'var(--red)' : 'var(--yellow)';
+  const maxPainDiff = spotPrice - maxPain;
+
+  // PCR gauge position (0–2 range mapped to 0–100%)
+  const gaugePos = Math.min(Math.max((pcr / 2) * 100, 2), 98);
+
+  return `
+    <!-- Signal Banner -->
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;
+                background:rgba(${signal==='BULLISH'?'0,212,154':signal==='BEARISH'?'255,69,96':'245,197,24'},.08);
+                border:1px solid rgba(${signal==='BULLISH'?'0,212,154':signal==='BEARISH'?'255,69,96':'245,197,24'},.25);
+                border-radius:10px">
+      <span style="font-size:1.3rem">${sigIcon}</span>
+      <div style="flex:1">
+        <div style="font-size:.82rem;font-weight:800;color:${sigColor}">${signal} BIAS</div>
+        <div style="font-size:.62rem;color:var(--muted2)">${d.symbol} · Expiry: ${expiry} · Spot ₹${spotPrice?.toLocaleString('en-IN')}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:1.2rem;font-weight:800;color:${pcrColor}">${pcr?.toFixed(2)}</div>
+        <div style="font-size:.57rem;color:var(--muted2)">PCR</div>
+      </div>
+    </div>
+
+    <!-- 3 key metrics -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+      <div style="background:var(--card2);border:1px solid var(--border2);border-radius:9px;padding:9px;text-align:center">
+        <div style="font-size:.58rem;color:var(--muted2);font-weight:700;text-transform:uppercase;margin-bottom:3px">PCR</div>
+        <div style="font-size:1.1rem;font-weight:800;color:${pcrColor}">${pcr?.toFixed(2)}</div>
+        <div style="font-size:.57rem;color:var(--muted2)">${pcr>=1.2?'Bullish':pcr<=0.8?'Bearish':'Neutral'}</div>
+      </div>
+      <div style="background:var(--card2);border:1px solid var(--border2);border-radius:9px;padding:9px;text-align:center">
+        <div style="font-size:.58rem;color:var(--muted2);font-weight:700;text-transform:uppercase;margin-bottom:3px">Max Pain</div>
+        <div style="font-size:1rem;font-weight:800;color:#a855f7">₹${maxPain?.toLocaleString('en-IN')}</div>
+        <div style="font-size:.57rem;color:var(--muted2)">${Math.abs(maxPainDiff)<50?'At max pain':maxPainDiff>0?'+'+maxPainDiff.toFixed(0)+' above':Math.abs(maxPainDiff).toFixed(0)+' below'}</div>
+      </div>
+      <div style="background:var(--card2);border:1px solid var(--border2);border-radius:9px;padding:9px;text-align:center">
+        <div style="font-size:.58rem;color:var(--muted2);font-weight:700;text-transform:uppercase;margin-bottom:3px">CE/PE OI</div>
+        <div style="font-size:.82rem;font-weight:800;color:var(--red)">${(totalCEOI/1e5).toFixed(1)}L</div>
+        <div style="font-size:.57rem;color:var(--green)">${(totalPEOI/1e5).toFixed(1)}L PE</div>
+      </div>
+    </div>
+
+    <!-- PCR gauge -->
+    <div style="margin-bottom:10px">
+      <div style="position:relative;height:7px;background:linear-gradient(to right,#ff6b6b 0%,#ffd93d 50%,#6bcb77 100%);border-radius:4px;margin-bottom:4px">
+        <div style="position:absolute;top:-3px;width:3px;height:13px;background:#fff;border-radius:2px;
+                    left:${gaugePos}%;transform:translateX(-50%);box-shadow:0 0 4px rgba(0,0,0,.5)"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.57rem;color:var(--muted2)">
+        <span>0 Bearish</span><span>0.7</span><span>1.0</span><span>1.3</span><span>2.0 Bullish</span>
+      </div>
+    </div>
+
+    <!-- Support & Resistance from OI -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <div style="font-size:.6rem;color:var(--red);font-weight:700;margin-bottom:5px">🔴 RESISTANCE (Call Wall)</div>
+        ${(resistances||[]).slice(0,3).map((r,i)=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;
+                    padding:6px 9px;margin-bottom:4px;border-radius:7px;
+                    background:rgba(255,69,96,${0.1-i*0.025});border:1px solid rgba(255,69,96,${0.2-i*0.05})">
+          <div>
+            <div style="font-size:.74rem;font-weight:800;color:var(--text)">₹${r.strike?.toLocaleString('en-IN')}</div>
+            <div style="font-size:.57rem;color:var(--muted2)">${((r.oi||0)/1e5).toFixed(1)}L OI</div>
+          </div>
+          <span style="font-size:.6rem;color:var(--red);font-weight:700">${i===0?'KEY':'#'+(i+1)}</span>
+        </div>`).join('')}
+      </div>
+      <div>
+        <div style="font-size:.6rem;color:var(--green);font-weight:700;margin-bottom:5px">🟢 SUPPORT (Put Wall)</div>
+        ${(supports||[]).slice(0,3).map((s,i)=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;
+                    padding:6px 9px;margin-bottom:4px;border-radius:7px;
+                    background:rgba(0,212,154,${0.1-i*0.025});border:1px solid rgba(0,212,154,${0.2-i*0.05})">
+          <div>
+            <div style="font-size:.74rem;font-weight:800;color:var(--text)">₹${s.strike?.toLocaleString('en-IN')}</div>
+            <div style="font-size:.57rem;color:var(--muted2)">${((s.oi||0)/1e5).toFixed(1)}L OI</div>
+          </div>
+          <span style="font-size:.6rem;color:var(--green);font-weight:700">${i===0?'KEY':'#'+(i+1)}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- OI Heatmap (compact) -->
+    <div style="margin-bottom:10px">
+      <div style="font-size:.62rem;font-weight:700;color:var(--text);margin-bottom:6px">🔥 OI Heatmap</div>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:3px;font-size:.57rem;margin-bottom:3px">
+        <div style="text-align:right;color:var(--green);font-weight:700">PUT OI →</div>
+        <div style="text-align:center;color:var(--muted2)">Strike</div>
+        <div style="text-align:left;color:var(--red);font-weight:700">← CALL OI</div>
+      </div>
+      ${(strikes||[]).map(row => {
+        const isSpot = Math.abs(row.strike - spotPrice) < 51;
+        const maxOI  = Math.max(...(strikes||[]).map(r=>Math.max(r.ceOI||0,r.peOI||0)),1);
+        const ceW    = Math.max(((row.ceOI||0)/maxOI*80),1).toFixed(0);
+        const peW    = Math.max(((row.peOI||0)/maxOI*80),1).toFixed(0);
+        return `
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:3px;align-items:center;
+                    margin-bottom:2px;${isSpot?'background:rgba(168,85,247,.15);border-radius:5px;padding:1px 3px;':''}">
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px">
+            <span style="font-size:.55rem;color:var(--muted2)">${((row.peOI||0)/1e5).toFixed(1)}L</span>
+            <div style="height:10px;width:${peW}px;background:rgba(0,212,154,.5);border-radius:2px 0 0 2px"></div>
+          </div>
+          <div style="font-size:.62rem;font-weight:${isSpot?800:500};color:${isSpot?'#a855f7':'var(--muted2)'};
+                      text-align:center;min-width:48px;white-space:nowrap">
+            ${isSpot?'▶':''} ${row.strike?.toLocaleString('en-IN')} ${isSpot?'◀':''}
+          </div>
+          <div style="display:flex;align-items:center;gap:3px">
+            <div style="height:10px;width:${ceW}px;background:rgba(255,69,96,.5);border-radius:0 2px 2px 0"></div>
+            <span style="font-size:.55rem;color:var(--muted2)">${((row.ceOI||0)/1e5).toFixed(1)}L</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Plain English summary -->
+    <div style="background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-radius:9px;padding:10px">
+      <div style="font-size:.64rem;font-weight:700;color:#a855f7;margin-bottom:5px">💡 What this means</div>
+      <div style="font-size:.67rem;color:var(--muted2);line-height:1.8">${signalDetail}</div>
+    </div>`;
+}
+
 </script>
 </body>
 </html>
